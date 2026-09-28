@@ -3,176 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>棋 · 密 · 工具箱</title>
+  <meta name="description" content="本地运行的五子棋对弈应用，内置 Minimax + VCT/VCF AI 引擎，无需联网">
+  <title>五子棋 · 本地对弈</title>
   <link rel="stylesheet" href="css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <a href="#/" class="logo">
-        <span>♟️</span>
-        <span>棋 · 密 · 工具箱</span>
-      </a>
-      <nav class="nav">
-        <a href="#/">首页</a>
-        <a href="#/crypto">加密工具</a>
-      </nav>
-      <div class="badge">纯静态 · 本地运行</div>
+      <div class="logo">
+        <span class="logo-stones" aria-hidden="true"><i class="s-black"></i><i class="s-white"></i></span>
+        <span class="logo-text">五子棋<small>Gomoku</small></span>
+      </div>
+      <span class="badge">⚡ 本地引擎 · 无需联网</span>
     </div>
   </header>
 
-  <main id="app">
-    <!-- 首页视图 -->
-    <section id="view-home" class="view">
-      <div class="hero">
-        <h1>本地运行的棋类与加密工具箱</h1>
-        <p>中国象棋 · 国际象棋 · 五子棋 · AES · Base64 · SHA-256/512</p>
-      </div>
-
-      <div class="section-title">🎲 对弈 &amp; 分析</div>
-      <div class="games-grid">
-        <a class="game-card" href="#/xiangqi">
-          <div class="game-icon">🀄</div>
-          <div class="game-name">中国象棋</div>
-          <div class="game-desc">本地引擎 · Pikafish</div>
-          <div class="tag">AI 分析</div>
-        </a>
-        <a class="game-card" href="#/chess">
-          <div class="game-icon">♞</div>
-          <div class="game-name">国际象棋</div>
-          <div class="game-desc">本地引擎 · Stockfish</div>
-          <div class="tag">AI 分析</div>
-        </a>
-        <a class="game-card" href="#/gomoku">
-          <div class="game-icon">⚫</div>
-          <div class="game-name">五子棋</div>
-          <div class="game-desc">Minimax + 剪枝</div>
-          <div class="tag">AI 对弈</div>
-        </a>
-      </div>
-      
-      <div class="section-title">🔐 加密 &amp; 编码</div>
-<div class="crypto-entry-wrap">
-  <a class="crypto-entry" href="#/crypto">
-    <div class="crypto-entry-icon">🔐</div>
-    <div class="crypto-entry-text">
-      <div class="crypto-entry-title">加密工具箱</div>
-      <div class="crypto-entry-desc">AES · Base64 · SHA-256 · SHA-512</div>
-    </div>
-    <div class="crypto-entry-arrow">→</div>
-  </a>
-</div>
-    </section>
-
-    <!-- 加密工具箱视图 -->
-    <section id="view-crypto" class="view hidden">
-      <a href="#/" class="back-link">← 返回首页</a>
-      <h2>加密工具箱</h2>
-      <div class="crypto-grid">
-
-        <!-- AES -->
-        <div class="crypto-card">
-          <div class="crypto-header">
-            <span class="crypto-icon">🔒</span>
-            <span class="crypto-name">AES 加密 / 解密</span>
-          </div>
-          <div class="crypto-desc">AES-GCM 256 · PBKDF2 派生密钥 · 随机 IV</div>
-          <input class="crypto-input" id="aesInput" type="text" value="Hello 棋密" placeholder="输入明文或密文">
-          <div class="crypto-actions">
-            <button class="btn btn-primary" id="aesEncryptBtn">加密</button>
-            <button class="btn" id="aesDecryptBtn">解密</button>
-          </div>
-          <div class="crypto-result" id="aesResult">等待操作…</div>
-        </div>
-
-        <!-- Base64 -->
-        <div class="crypto-card">
-          <div class="crypto-header">
-            <span class="crypto-icon">📦</span>
-            <span class="crypto-name">Base64 编码 / 解码</span>
-          </div>
-          <div class="crypto-desc">支持 UTF-8 中文</div>
-          <input class="crypto-input" id="base64Input" type="text" value="棋 · 密" placeholder="输入文本或 Base64">
-          <div class="crypto-actions">
-            <button class="btn btn-primary" id="base64EncodeBtn">编码</button>
-            <button class="btn" id="base64DecodeBtn">解码</button>
-          </div>
-          <div class="crypto-result" id="base64Result">等待操作…</div>
-        </div>
-
-        <!-- SHA-256 -->
-        <div class="crypto-card">
-          <div class="crypto-header">
-            <span class="crypto-icon">#️⃣</span>
-            <span class="crypto-name">SHA-256 哈希</span>
-          </div>
-          <div class="crypto-desc">不可逆 · 十六进制输出</div>
-          <input class="crypto-input" id="sha256Input" type="text" value="Hash me" placeholder="输入消息">
-          <div class="crypto-actions">
-            <button class="btn btn-primary" id="sha256Btn">生成哈希</button>
-          </div>
-          <div class="crypto-result" id="sha256Result">等待操作…</div>
-        </div>
-
-        <!-- SHA-512 -->
-        <div class="crypto-card">
-          <div class="crypto-header">
-            <span class="crypto-icon">⁵️⃣</span>
-            <span class="crypto-name">SHA-512 哈希</span>
-          </div>
-          <div class="crypto-desc">不可逆 · 更长摘要</div>
-          <input class="crypto-input" id="sha512Input" type="text" value="Hash me too" placeholder="输入消息">
-          <div class="crypto-actions">
-            <button class="btn btn-primary" id="sha512Btn">生成哈希</button>
-          </div>
-          <div class="crypto-result" id="sha512Result">等待操作…</div>
-        </div>
-
+  <main class="layout">
+    <section class="board-panel" aria-label="棋盘">
+      <div class="board-frame">
+        <canvas id="gomokuCanvas" width="620" height="620"></canvas>
       </div>
     </section>
 
-    <!-- 棋类占位视图 -->
-    <section id="view-xiangqi" class="view hidden">
-      <a href="#/" class="back-link">← 返回首页</a>
-      <h2>中国象棋</h2>
-      <p class="crypto-desc">开发中…（下一批实现，使用本地 Pikafish 引擎）</p>
-    </section>
-    <section id="view-chess" class="view hidden">
-      <a href="#/" class="back-link">← 返回首页</a>
-      <h2>国际象棋</h2>
-      <p class="crypto-desc">开发中…（下一批实现，使用本地 Stockfish 引擎）</p>
-    </section>
-    <section id="view-gomoku" class="view hidden">
-  <a href="#/" class="back-link">← 返回首页</a>
-  <h2>五子棋</h2>
-  <div class="game-container">
-    <canvas id="gomokuCanvas"></canvas>
-    <div class="game-controls">
-      <button class="btn btn-primary" id="gomokuRestart">重新开始</button>
-      <span id="gomokuStatus" style="font-size:0.9rem; color:#64748b;">你的回合 (黑棋)</span>
-    </div>
-  </div>
-</section>
+    <aside class="side-panel">
+      <div class="card status-card">
+        <div class="turn-indicator">
+          <span class="stone-icon black" id="turnStone"></span>
+          <span id="statusText">你的回合 · 执黑先行</span>
+          <span class="thinking" id="thinkingIndicator" aria-hidden="true"><i></i><i></i><i></i></span>
+        </div>
+        <div class="move-count">第 <b id="moveCount">0</b> 手</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">难度</div>
+        <div class="difficulty" id="difficultyGroup">
+          <button type="button" class="diff-btn" data-depth="2" data-vct="0" data-vctdepth="8">简单</button>
+          <button type="button" class="diff-btn active" data-depth="4" data-vct="1" data-vctdepth="8">中等</button>
+          <button type="button" class="diff-btn" data-depth="6" data-vct="1" data-vctdepth="8">困难</button>
+        </div>
+        <p class="card-hint" id="diffHint">搜索深度 4 层 · VCT 算杀 8 层</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">对局</div>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="restartBtn">新对局</button>
+          <button type="button" class="btn" id="undoBtn" disabled>悔棋</button>
+        </div>
+        <div class="scoreboard">
+          <div class="score-item">
+            <span class="stone-icon black"></span><span class="score-name">你</span>
+            <b id="playerScore">0</b>
+          </div>
+          <span class="score-divider">:</span>
+          <div class="score-item">
+            <b id="aiScore">0</b><span class="score-name">AI</span>
+            <span class="stone-icon white"></span>
+          </div>
+        </div>
+      </div>
+    </aside>
   </main>
 
   <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="fingerprint-badge">
-        <span>🆔</span> 设备指纹: <span id="fingerprintDisplay">计算中…</span>
-      </div>
-      <div class="fingerprint-badge">
-        <span>🍀</span> 今日幸运值: <span id="luckyDisplay">--</span>
-      </div>
-    </div>
+    <p>纯静态应用 · Minimax + α-β 剪枝 + VCT/VCF · 所有计算在本地浏览器完成</p>
   </footer>
 
-  <script src="js/fingerprint.js"></script>
-  <script src="js/lucky.js"></script>
-  <script src="js/crypto-tools.js"></script>
   <script src="js/gomoku.js"></script>
-  <script src="js/main.js"></script>
 </body>
 </html>
