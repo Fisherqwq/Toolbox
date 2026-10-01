@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>摆摊 · 3 副棋和 4 个密码工具的本地摊位</title>
+  <meta name="description" content="3 副棋、4 个密码工具，摊在你自己的浏览器台面上。断网可用，不注册，不上传。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@600;900&family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#/" class="logo">
+        <iconify-icon icon="mdi:storefront-outline" class="logo-mark"></iconify-icon>
+        <span class="logo-word">摆摊</span>
+        <span class="logo-slash">/</span>
+        <span class="logo-sub">本地小摊</span>
+      </a>
+      <nav class="nav">
+        <a href="#/">首页</a>
+        <a href="#/chess">国际象棋</a>
+        <a href="#/gomoku">五子棋</a>
+        <a href="#/crypto">加密计算</a>
+      </nav>
+      <div class="badge">
+        <span class="pulse"></span>断网可用 · 数据不出本机
+      </div>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- 首页视图 -->
+    <section id="view-home" class="view">
+      <div class="masthead">
+        <div class="masthead-text">
+          <p class="eyebrow"><span class="eyebrow-num">01</span> 摊位在你本机 · 装机量 0 · 联网需求 0</p>
+          <h1 class="masthead-title">
+            3 副棋，4 个密码工具，<br>
+            <em>全在你这台机器上算完。</em>
+          </h1>
+          <p class="masthead-lede">
+            没有服务器，没有账号。点开就能下棋，拔网线也能算哈希 ——
+            东西算完直接扔掉，浏览器一关，什么都不剩。
+          </p>
+          <div class="masthead-stats">
+            <div class="stat">
+              <b class="stat-num">3</b>
+              <span class="stat-label">款可玩棋类</span>
+            </div>
+            <div class="stat">
+              <b class="stat-num">0</b>
+              <span class="stat-label">次网络请求</span>
+            </div>
+            <div class="stat">
+              <b class="stat-num">64</b>
+              <span class="stat-label">格棋盘 × 2</span>
+            </div>
+          </div>
+          <div class="masthead-actions">
+            <a class="btn-ink" href="#/chess">
+              <iconify-icon icon="mdi:chess-rook"></iconify-icon>先下一盘国际象棋
+            </a>
+            <a class="btn-quiet" href="#/crypto">
+              <iconify-icon icon="mdi:lock-outline"></iconify-icon>我只想算个哈希
+            </a>
+          </div>
+        </div>
+        <figure class="masthead-figure">
+          <img
+            src="https://picsum.photos/seed/chessdesk-blues/720/900"
+            alt="一张木桌上的国际象棋残局" loading="eager" decoding="async">
+          <figcaption>
+            <iconify-icon icon="mdi:clock-outline"></iconify-icon>
+            地铁上没信号的那 20 分钟，就用来下棋
+          </figcaption>
+        </figure>
+      </div>
+
+      <div class="section-marker">
+        <span class="marker-index">02</span>
+        <h2 class="marker-title">三张桌子</h2>
+        <p class="marker-note">难度都能调，AI 全在本机跑</p>
+      </div>
+
+      <div class="tables">
+        <a class="table-card table-card--wide" href="#/chess">
+          <img class="table-shot"
+               src="https://picsum.photos/seed/chessboard-wide/900/500"
+               alt="黑白棋子对弈的俯视画面" loading="lazy" decoding="async">
+          <div class="table-body">
+            <span class="table-icon"><iconify-icon icon="mdi:chess-rook"></iconify-icon></span>
+            <h3 class="table-name">国际象棋</h3>
+            <p class="table-desc">
+              走 Stockfish 19，深度 4 到 14 三档。引擎在你自己机器上跑，
+              拔网线也能下。
+            </p>
+            <ul class="table-facts">
+              <li><b>深度 4 / 8 / 14</b><span>三档难度</span></li>
+              <li><b>cburnett 棋子</b><span>和 chess.com 同款</span></li>
+            </ul>
+            <span class="table-go">开局<iconify-icon icon="mdi:arrow-right"></iconify-icon></span>
+          </div>
+        </a>
+
+        <a class="table-card" href="#/gomoku">
+          <img class="table-shot"
+               src="https://picsum.photos/seed/gomoku-stone/600/420"
+               alt="棋盘上一颗孤零零的黑子" loading="lazy" decoding="async">
+          <div class="table-body">
+            <span class="table-icon"><iconify-icon icon="mdi:circle-outline"></iconify-icon></span>
+            <h3 class="table-name">五子棋</h3>
+            <p class="table-desc">
+              搜索最深 6 层，还带 8 层 VCT 算杀 —— 连着四颗它就认输了，
+              不会让你慢慢磨。
+            </p>
+            <span class="table-go">摆一颗<iconify-icon icon="mdi:arrow-right"></iconify-icon></span>
+          </div>
+        </a>
+
+        <a class="table-card table-card--muted" href="#/xiangqi">
+          <div class="table-body">
+            <span class="table-icon"><iconify-icon icon="mdi:vector-square"></iconify-icon></span>
+            <h3 class="table-name">中国象棋</h3>
+            <p class="table-desc">
+              还没写。计划接 Pikafish 本地引擎 —— 现在点进去只有一句话，别抱期待。
+            </p>
+            <span class="table-tag">施工中 · 大概还得一阵</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="section-marker">
+        <span class="marker-index">03</span>
+        <h2 class="marker-title">随手用的密码本</h2>
+        <p class="marker-note">粘进去，按一下，复制走</p>
+      </div>
+
+      <a class="ledger" href="#/crypto">
+        <div class="ledger-main">
+          <span class="ledger-icon"><iconify-icon icon="mdi:package-variant-closed"></iconify-icon></span>
+          <h3>加密工具箱</h3>
+          <p>
+            AES-GCM 加密、Base64 编码、SHA-256 和 SHA-512 哈希。
+            拿来发密码、核对文件、给一段配置算个校验值都够用。
+          </p>
+          <ul class="ledger-tags">
+            <li>AES-GCM 256</li>
+            <li>PBKDF2 派生</li>
+            <li>随机 IV</li>
+            <li>SHA-512</li>
+          </ul>
+        </div>
+        <div class="ledger-side">
+          <img src="https://picsum.photos/seed/padlock-macro/560/520"
+               alt="锁头特写" loading="lazy" decoding="async">
+          <span class="ledger-arrow">打开<iconify-icon icon="mdi:arrow-right"></iconify-icon></span>
+        </div>
+      </a>
+    </section>
+
+    <!-- 加密工具箱视图 -->
+    <section id="view-crypto" class="view hidden">
+      <a href="#/" class="back-link">
+        <iconify-icon icon="mdi:arrow-left"></iconify-icon> 回首页
+      </a>
+      <div class="view-head">
+        <h2>加密工具箱</h2>
+        <p>4 个小工具，共用一条规矩：算完就忘，不存盘、不上传。</p>
+      </div>
+      <div class="crypto-grid">
+
+        <!-- AES -->
+        <div class="crypto-card">
+          <div class="crypto-header">
+            <span class="crypto-icon"><iconify-icon icon="mdi:lock-outline"></iconify-icon></span>
+            <span class="crypto-name">AES 加密 / 解密</span>
+          </div>
+          <p class="crypto-desc">发一条不想被中间人看的消息。密钥从你输入的密码派生，每次 IV 都是随机的。</p>
+          <input class="crypto-input" id="aesInput" type="text" value="Hello 摆摊" placeholder="输入明文或密文">
+          <div class="crypto-actions">
+            <button class="btn btn-primary" id="aesEncryptBtn">加密</button>
+            <button class="btn" id="aesDecryptBtn">解密</button>
+          </div>
+          <div class="crypto-result" id="aesResult">还没按过按钮</div>
+        </div>
+
+        <!-- Base64 -->
+        <div class="crypto-card">
+          <div class="crypto-header">
+            <span class="crypto-icon"><iconify-icon icon="mdi:package-variant-closed"></iconify-icon></span>
+            <span class="crypto-name">Base64 编码 / 解码</span>
+          </div>
+          <p class="crypto-desc">中文也能过。刚到手的一段乱码，十有八九是它。</p>
+          <input class="crypto-input" id="base64Input" type="text" value="摆摊 · 本地小摊" placeholder="输入文本或 Base64">
+          <div class="crypto-actions">
+            <button class="btn btn-primary" id="base64EncodeBtn">编码</button>
+            <button class="btn" id="base64DecodeBtn">解码</button>
+          </div>
+          <div class="crypto-result" id="base64Result">还没按过按钮</div>
+        </div>
+
+        <!-- SHA-256 -->
+        <div class="crypto-card">
+          <div class="crypto-header">
+            <span class="crypto-icon"><iconify-icon icon="mdi:tag-outline"></iconify-icon></span>
+            <span class="crypto-name">SHA-256 哈希</span>
+          </div>
+          <p class="crypto-desc">给文件算个指纹，64 位十六进制。改了 1 个字节，结果就完全不同。</p>
+          <input class="crypto-input" id="sha256Input" type="text" value="Hash me" placeholder="输入消息">
+          <div class="crypto-actions">
+            <button class="btn btn-primary" id="sha256Btn">生成哈希</button>
+          </div>
+          <div class="crypto-result" id="sha256Result">还没按过按钮</div>
+        </div>
+
+        <!-- SHA-512 -->
+        <div class="crypto-card">
+          <div class="crypto-header">
+            <span class="crypto-icon"><iconify-icon icon="mdi:shield-check-outline"></iconify-icon></span>
+            <span class="crypto-name">SHA-512 哈希</span>
+          </div>
+          <p class="crypto-desc">同上，摘要长一倍：128 位十六进制。撞车概率更低。</p>
+          <input class="crypto-input" id="sha512Input" type="text" value="Hash me too" placeholder="输入消息">
+          <div class="crypto-actions">
+            <button class="btn btn-primary" id="sha512Btn">生成哈希</button>
+          </div>
+          <div class="crypto-result" id="sha512Result">还没按过按钮</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 棋类占位视图 -->
+    <section id="view-xiangqi" class="view hidden">
+      <a href="#/" class="back-link">
+        <iconify-icon icon="mdi:arrow-left"></iconify-icon> 回首页
+      </a>
+      <div class="view-head">
+        <h2>中国象棋</h2>
+        <p>还没写完，计划接 Pikafish 本地引擎。先占个位，别在这儿耗时间。</p>
+      </div>
+    </section>
+    <section id="view-chess" class="view hidden">
+      <a href="#/" class="back-link">
+        <iconify-icon icon="mdi:arrow-left"></iconify-icon> 回首页
+      </a>
+      <div class="view-head">
+        <h2>国际象棋</h2>
+        <p>你执白先行。引擎在你本机跑，思考的时候也不会卡住你走子。</p>
+      </div>
+
+      <div class="chess-layout">
+        <div class="chess-board-frame">
+          <canvas id="chessCanvas" width="688" height="688"></canvas>
+          <div class="chess-promotion" id="chessPromotion" role="dialog" aria-label="选择升变棋子"></div>
+        </div>
+
+        <aside class="chess-side-panel">
+          <div class="chess-card chess-status-card">
+            <div class="chess-turn-indicator">
+              <span class="chess-turn-dot" id="chessTurnDot"></span>
+              <span id="chessStatusText">加载中…</span>
+              <span class="chess-thinking" id="chessThinkingIndicator"><i></i><i></i><i></i></span>
+            </div>
+            <div class="chess-move-meta">
+              <span>第 <b id="chessMoveCount">0</b> 回合</span>
+              <span class="chess-last-move" id="chessLastMove">—</span>
+            </div>
+          </div>
+
+          <div class="chess-card">
+            <div class="chess-card-title">引擎</div>
+            <div class="chess-engine-badge warn" id="chessEngineBadge">检测中…</div>
+            <div class="chess-engine-info" id="chessEngineInfo">—</div>
+            <p class="chess-card-hint">
+              需要 <code>js/lib/stockfish.js</code> + <code>js/lib/stockfish.wasm</code>。
+              没装就没法对弈，下面可直接下载。
+            </p>
+            <div class="chess-engine-help hidden" id="chessEngineHelp">
+              <div class="chess-engine-help-title">缺少 Stockfish 引擎</div>
+              <p class="chess-engine-help-text">
+                下载 <code>stockfish.js</code> 与 <code>stockfish.wasm</code>，
+                放到 <code>js/lib/</code> 目录后刷新页面即可自动启用。
+              </p>
+              <a class="chess-btn chess-btn-primary chess-engine-download"
+                 id="chessEngineDownload"
+                 href="https://github.com/nmrugg/stockfish.js/releases"
+                 target="_blank" rel="noopener noreferrer">前往下载 Stockfish</a>
+              <button type="button" class="chess-btn chess-btn-ghost" id="chessEngineRetry">重新检测</button>
+            </div>
+          </div>
+
+          <div class="chess-card">
+            <div class="chess-card-title">难度</div>
+            <div class="chess-difficulty" id="chessDepthGroup">
+              <button type="button" class="chess-diff-btn" data-preset="easy" data-hint="Stockfish 深度 4">简单</button>
+              <button type="button" class="chess-diff-btn active" data-preset="normal" data-hint="Stockfish 深度 8">中等</button>
+              <button type="button" class="chess-diff-btn" data-preset="hard" data-hint="Stockfish 深度 14">困难</button>
+            </div>
+            <p class="chess-card-hint" id="chessDepthHint">正在检测引擎…</p>
+          </div>
+
+          <div class="chess-card">
+            <div class="chess-card-title">对局</div>
+            <div class="chess-actions">
+              <button type="button" class="chess-btn chess-btn-primary" id="chessRestartBtn">新对局</button>
+              <button type="button" class="chess-btn" id="chessUndoBtn" disabled>悔棋</button>
+            </div>
+            <div class="chess-actions chess-actions-secondary">
+              <button type="button" class="chess-btn chess-btn-ghost" id="chessFlipBtn">翻转棋盘</button>
+              <button type="button" class="chess-btn chess-btn-ghost" id="chessCopyFenBtn">复制 FEN</button>
+            </div>
+            <div class="chess-scoreboard">
+              <div class="chess-score-item">
+                <span class="chess-piece-icon white">♔</span>
+                <span class="chess-score-name">白</span>
+                <b id="chessWhiteScore">0</b>
+              </div>
+              <span class="chess-score-divider">:</span>
+              <div class="chess-score-item">
+                <b id="chessBlackScore">0</b>
+                <span class="chess-score-name">黑</span>
+                <span class="chess-piece-icon black">♚</span>
+              </div>
+              <div class="chess-score-item chess-score-draw">
+                <span class="chess-score-name">和</span>
+                <b id="chessDrawScore">0</b>
+              </div>
+            </div>
+          </div>
+
+          <div class="chess-card">
+            <button type="button" class="chess-history-toggle" id="chessHistoryToggle">走子记录 ▼</button>
+            <div class="chess-history-list" id="chessHistoryList">
+              <div class="chess-history-empty">还没有走子</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+    <section id="view-gomoku" class="view hidden">
+  <a href="#/" class="back-link">
+    <iconify-icon icon="mdi:arrow-left"></iconify-icon> 回首页
+  </a>
+  <div class="view-head">
+    <h2>五子棋</h2>
+    <p>黑棋先行，五子连成一线就赢。AI 会算杀，连四的时候别磨蹭。</p>
+  </div>
+
+  <div class="gomoku-layout">
+    <div class="gomoku-board-frame">
+      <canvas id="gomokuCanvas" width="620" height="620"></canvas>
+    </div>
+
+    <aside class="gomoku-side-panel">
+      <div class="gomoku-card gomoku-status-card">
+        <div class="gomoku-turn-indicator">
+          <span class="gomoku-stone-icon black" id="gomokuTurnStone"></span>
+          <span id="gomokuStatusText">你的回合 · 执黑先行</span>
+          <span class="gomoku-thinking" id="gomokuThinkingIndicator"><i></i><i></i><i></i></span>
+        </div>
+        <div class="gomoku-move-count">第 <b id="gomokuMoveCount">0</b> 手</div>
+      </div>
+
+      <div class="gomoku-card">
+        <div class="gomoku-card-title">难度</div>
+        <div class="gomoku-difficulty" id="gomokuDifficultyGroup">
+          <button type="button" class="gomoku-diff-btn" data-depth="2" data-vct="0" data-vctdepth="8">简单</button>
+          <button type="button" class="gomoku-diff-btn active" data-depth="4" data-vct="1" data-vctdepth="8">中等</button>
+          <button type="button" class="gomoku-diff-btn" data-depth="6" data-vct="1" data-vctdepth="8">困难</button>
+        </div>
+        <p class="gomoku-card-hint" id="gomokuDiffHint">搜索深度 4 层 · VCT 算杀 8 层</p>
+      </div>
+
+      <div class="gomoku-card">
+        <div class="gomoku-card-title">对局</div>
+        <div class="gomoku-actions">
+          <button type="button" class="gomoku-btn gomoku-btn-primary" id="gomokuRestartBtn">新对局</button>
+          <button type="button" class="gomoku-btn" id="gomokuUndoBtn" disabled>悔棋</button>
+        </div>
+        <div class="gomoku-scoreboard">
+          <div class="gomoku-score-item">
+            <span class="gomoku-stone-icon black"></span><span class="gomoku-score-name">你</span>
+            <b id="gomokuPlayerScore">0</b>
+          </div>
+          <span class="gomoku-score-divider">:</span>
+          <div class="gomoku-score-item">
+            <b id="gomokuAiScore">0</b><span class="gomoku-score-name">AI</span>
+            <span class="gomoku-stone-icon white"></span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p class="footer-note">
+        全部计算在浏览器里完成，刷新页面就归零。
+        设备指纹只是给你自己看的，两台设备打开同一页会得到不同的串。
+      </p>
+      <div class="footer-chips">
+        <div class="chip">
+          <iconify-icon icon="mdi:fingerprint"></iconify-icon>
+          <span class="chip-key">设备指纹</span>
+          <span class="chip-val" id="fingerprintDisplay">算着呢…</span>
+        </div>
+        <div class="chip">
+          <iconify-icon icon="mdi:star-four-points-outline"></iconify-icon>
+          <span class="chip-key">今日幸运值</span>
+          <span class="chip-val" id="luckyDisplay">--</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/fingerprint.js"></script>
+  <script src="js/lucky.js"></script>
+  <script src="js/crypto-tools.js"></script>
+  <script src="js/gomoku.js"></script>
+  <script type="module" src="js/chess-bridge.js"></script>
+  <script src="js/chess.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

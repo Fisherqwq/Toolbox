@@ -1,0 +1,21 @@
+# ---- 第三方引擎二进制：不进版本库 ----
+# 这些是可从上游重新下载的第三方文件（Stockfish，GPLv3），
+# 体积大且与业务代码无关，纳入 git 会让仓库臃肿、diff 失效。
+# 缺失时页面会提示下载入口，详见 README。
+js/lib/stockfish.js
+js/lib/stockfish.wasm
+
+# ---- 临时/备份目录 ----
+tmp_*
+*.bak
+*.orig
+*.tmp
+
+# ---- 编辑器 ----
+.vscode/
+.idea/
+
+# ---- 系统 ----
+Thumbs.db
+desktop.ini
+.DS_Store
