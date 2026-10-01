@@ -110,8 +110,16 @@ function handleLine(raw) {
     // 永远滞留 —— 表现就是「引擎加载成功但 AI 从不走子」。
     // 参考项目（Knight-Chess-Helper）也没等 readyok。
     uciReady = true;
-    send('setoption name Threads value 1');   // 单线程构建，显式写死 1
-    send('setoption name Hash value 16');
+    // 注意：这里**不要**发 setoption。
+    //
+    // 实测（浏览器控制台三段对照测试）：一旦在 go 之前发过
+    // `setoption name Threads value 1` / `setoption name Hash value 16`，
+    // 引擎就会彻底沉默 —— 连一条 info 都不吐。原因是 Stockfish 处理
+    // Threads 选项会重建线程池，而本构建是**单线程 wasm**（Threads max 1），
+    // 重建线程池在无 pthread 的环境下会把引擎打挂。
+    //
+    // 而且这两条本来就没必要：引擎默认值已经是 Threads=1、Hash=16，
+    // 发出去等于「用一个会触发重建的路径去设置成它已有的值」。
     flush();
     self.postMessage({ type: 'ready' });
     return;
