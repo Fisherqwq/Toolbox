@@ -745,10 +745,16 @@
       // 留一点延迟，节奏上和引擎思考一致，避免「秒回」显得假
       setTimeout(() => {
         if (startGen !== gen || !thinking) return;   // 期间重开了对局
-        if (playBookMove(book)) return;
-        // 库里的着法不合法（理论上不会发生）：退回引擎
+        // 关键：走库回复等价于引擎的 bestmove —— 必须先把「思考中」收掉。
+        // afterMove() 在轮到玩家时是直接 return 的，它不会复位 thinking；
+        // 引擎路径之所以没事，是因为 handleEngineMessage 在调 afterMove()
+        // 之前就置了 thinking=false。这里绕过了那个 handler，得自己补上，
+        // 否则 thinking 永远为 true，handleClick 第一行就 return，玩家动不了。
         thinking = false;
         setEngineThinking(false);
+        if (playBookMove(book)) return;
+        // 库里的着法不合法（理论上不会发生）：退回引擎
+        thinking = true;
         askEngine();
       }, 220);
       return;
@@ -1213,7 +1219,24 @@
     setupEngine();
   }
 
-  window.ChessApp = { init, newGame, undo: undoMoves, flip: flipBoard };
+  window.ChessApp = {
+    init, newGame, undo: undoMoves, flip: flipBoard,
+    /**
+     * 只读状态快照，控制台里敲 ChessApp.state() 就能看。
+     * 排查「点不动」这类问题时特别有用 —— 之前只能靠猜，
+     * 实际上八成是 thinking 忘了复位。
+     */
+    state() {
+      return {
+        thinking, gameOver, gameStarted, engineReady,
+        轮次: history.length,
+        当前行棋方: game ? game.turn() : null,
+        玩家可走: !gameOver && !thinking && !!game && game.turn() === playerColor,
+        难度: preset,
+        库可用: !!(window.ChessBook && window.ChessBook.moves),
+      };
+    },
+  };
 
   // 等 bridge 把 Chess 挂上来再初始化；init 内部有 initialized 幂等保护
   whenChessReady((C) => {
