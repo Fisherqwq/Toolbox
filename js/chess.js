@@ -99,6 +99,7 @@
   let playerColor = 'w';
   let orientation = 'w';           // 棋盘朝向：w = 白方在下
   let gen = 0;                     // 对局代数
+  let gameStarted = false;        // 是否已走出第一步（用于锁死难度）
   let engineReady = false;
   let badgeText = '检测中…';       // 引擎徽标文案（与样式解耦，便于 ready 后重绘）
   let badgeWarn = true;
@@ -514,6 +515,8 @@
   /** 走完一步后的公共处理：清选中、判终局、触发 AI */
   function afterMove() {
     clearSelection();
+    // 走出第一步即视为开局，难度从此锁定
+    if (!gameStarted) { gameStarted = true; updateDifficultyLock(); }
     updateMoveCount();
     updateLastMoveText();
     renderHistoryList();
@@ -697,16 +700,67 @@
     if (worker) worker.postMessage({ type: 'init', data: { gen, fen: game.fen() } });
   }
 
+  /* ============================================================
+   * 开局库
+   *
+   * js/chess-book.js 由 lichess-org/chess-openings（CC0）回放生成，
+   * 键是 FEN 前 4 段，值是空格分隔的候选着法（UCI，最多 3 个）。
+   * 只在前 BOOK_PLY 手查库：再往后就该让引擎接手了。
+   * ============================================================ */
+
+  const BOOK_PLY = 16;   // 前 8 个回合走库
+
+  function pickBookMove(fen, ply) {
+    if (ply >= BOOK_PLY) return null;
+    const book = window.ChessBook && window.ChessBook.moves;
+    if (!book) return null;
+    const list = book[fen.split(' ').slice(0, 4).join(' ')];
+    if (!list) return null;
+    const arr = list.split(' ');
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  /** 走一着库里的着法；返回 false 表示这着不合法，调用方应退回引擎 */
+  function playBookMove(uci) {
+    const args = { from: uci.slice(0, 2), to: uci.slice(2, 4) };
+    if (uci.length > 4) args.promotion = uci[4];
+    let move = null;
+    try { move = game.move(args); } catch (e) { return false; }
+    if (!move) return false;
+    pushHistory(move);
+    afterMove();
+    return true;
+  }
+
   function askEngine() {
     if (!worker) return;
+
+    // 前几手优先走开局库：又快又是公认的好棋
+    const book = pickBookMove(game.fen(), history.length);
+    if (book) {
+      thinking = true;
+      setEngineThinking(true);
+      setEngineInfo('开局库');
+      const startGen = gen;
+      // 留一点延迟，节奏上和引擎思考一致，避免「秒回」显得假
+      setTimeout(() => {
+        if (startGen !== gen || !thinking) return;   // 期间重开了对局
+        if (playBookMove(book)) return;
+        // 库里的着法不合法（理论上不会发生）：退回引擎
+        thinking = false;
+        setEngineThinking(false);
+        askEngine();
+      }, 220);
+      return;
+    }
+
     worker.postMessage({
       type: 'go',
       data: {
         gen,
         fen: game.fen(),
         depth: currentDepth(),
-        // 同时给 movetime：asm.js 版慢，movetime 保证引擎一定会交着法。
-        // 它先到哪个就用哪个，depth 够浅时通常 movetime 先到。
+        // 同时给 movetime：慢机器上到点必定交着法，不会干等到看门狗超时。
         movetime: MOVE_TIME_MS[preset] || MOVE_TIME_MS.normal,
       },
     });
@@ -929,6 +983,30 @@
       // AI 思考中不能悔棋，否则会与过期结果打架
       undo.disabled = thinking || history.length < 2;
     }
+    updateDifficultyLock();
+  }
+
+  /**
+   * 开局后锁死难度。
+   *
+   * 为什么锁：走到一半换档等于随时给自己降难度，赢了不算本事。
+   * 只有点「新对局」才解锁 —— 锁定状态用 gameStarted 记，
+   * 不看 history，否则一路悔棋回原点会把难度意外解锁。
+   */
+  function updateDifficultyLock() {
+    const group = $('chessDepthGroup');
+    if (!group) return;
+    const lock = gameStarted;
+    group.querySelectorAll('.chess-diff-btn').forEach((b) => { b.disabled = lock; });
+    const hint = $('chessDepthHint');
+    if (hint && lock) {
+      // 锁定时把「可调」的说法换成实际值，避免玩家以为按钮失灵了
+      const base = hint.dataset.base || hint.textContent;
+      hint.dataset.base = base;
+      hint.textContent = base + ' · 开局后锁定，点「新对局」可换';
+    } else if (hint && hint.dataset.base) {
+      hint.textContent = hint.dataset.base;
+    }
   }
 
   function loadScores() {
@@ -965,6 +1043,7 @@
     clearSelection();
     gameOver = false;
     thinking = false;
+    gameStarted = false;        // 新对局 → 解锁难度
     playerColor = 'w';
     orientation = 'w';
     setEngineThinking(false);
@@ -1040,7 +1119,7 @@
     if (group) {
       group.addEventListener('click', (e) => {
         const btn = e.target.closest('.chess-diff-btn');
-        if (!btn) return;
+        if (!btn || btn.disabled) return;          // 开局后锁定
         group.querySelectorAll('.chess-diff-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         preset = btn.dataset.preset;

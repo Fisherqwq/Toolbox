@@ -779,6 +779,15 @@ body {
   font-family: inherit; cursor: pointer; transition: all .3s var(--drift);
 }
 .chess-diff-btn:hover { color: var(--text); background: #eef2f6; }
+/* 开局后难度锁定：置灰但保留可读性，让人看得出「锁了」而不是「坏了」 */
+.chess-diff-btn:disabled {
+  opacity: .5; cursor: not-allowed;
+  background: transparent; border-style: dashed;
+}
+.chess-diff-btn:disabled:hover { color: var(--text-muted); background: transparent; }
+.chess-diff-btn:disabled.active {
+  opacity: .75; border-style: solid;
+}
 .chess-diff-btn.active {
   background: #fef3c7; border-color: #f59e0b; color: #b45309; font-weight: 600;
 }

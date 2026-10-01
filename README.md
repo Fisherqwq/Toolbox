@@ -42,9 +42,11 @@ Toolbox-main/
     ├── chess.js            国际象棋界面与对局
     ├── chess-bridge.js     把 ESM 的 chess.js 挂到 window（供经典脚本用）
     ├── chess-worker.js     Stockfish 后端（经典 Worker，走 UCI）
-    ├── chess-fallback-worker.js  简易引擎后端（ES module Worker）
-    ├── chess-engine/       国际象棋规则与兼底引擎
-    └── lib/                AI 引擎可执行文件（见 js/lib/README.md）
+    ├── chess-book.js       开局库（自动生成，见 tools/build-chess-book.mjs）
+    ├── chess-engine/       国际象棋规则（chess.js）与兼底引擎
+    └── lib/                Stockfish 可执行文件（不入库，见 js/lib/README.md）
+tools/
+    └── build-chess-book.mjs  重新生成开局库（Node 脚本）
 ```
 
 样式命名按工具分前缀：`.gomoku-*`、`.chess-*`、`.crypto-*`、`.game-*`。
@@ -117,6 +119,58 @@ Cross-Origin-Embedder-Policy: require-corp
 | --- | --- | --- |
 | `chess-worker.js` | 经典 Worker | Stockfish 的 Emscripten 构建依赖 `importScripts`，而 module worker 里没有这个函数 |
 
+### ⛔ 不要发 setoption（血的教训）
+
+```js
+send('setoption name Threads value 1');   // ← 千万别加
+send('setoption name Hash value 16');     // ← 千万别加
+```
+
+加了这两条，**引擎会彻底沉默 —— 连一条 `info` 都不吐**，表现为「AI 永远不走子」，
+但探测、握手、徽标全都显示正常，极难定位。
+
+原因：Stockfish 处理 `Threads` 选项会**重建线程池**，而本构建是单线程 wasm
+（`Threads max 1`），在无 pthread 的环境下重建线程池会把引擎打挂。
+而且这两条本来就没必要 —— 默认值已经是 `Threads=1` / `Hash=16`。
+
+浏览器控制台三段对照实验的结论（务必记住这个排查手法）：
+
+| 命令 | 结果 |
+| --- | --- |
+| `position startpos` + `go depth 8` | ✅ `bestmove e2e4` |
+| `position fen <FEN>` + `go depth 8` | ✅ `bestmove d7d5` |
+| `setoption`×2 + `ucinewgame` + `position` + `go` | ❌ 完全无输出 |
+
+### go 命令：depth 优先于 movetime
+
+`movetime` 是**时间上限不是目标** —— Stockfish 会把时间用满才停。
+两者同时给时 `movetime` 会盖掉 `depth`，导致每一步都硬等满时长。
+所以 `chess-worker.js` 里 **depth 优先**，`movetime` 只在没给 depth 时兜底。
+
+### 开局库
+
+`js/chess-book.js`（约 279 KB，3990 个局面）是**自动生成**的，别手工编辑：
+
+```bash
+node tools/build-chess-book.mjs
+```
+
+数据来自 [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings)
+（**CC0 1.0 Universal**，公共领域，可自由使用）。工具会回放每条 ECO 主变，
+用项目自带的 `chess.js` 推出每个局面的候选着法，键是 FEN 前 4 段。
+
+AI 在**前 8 个回合**优先走库（比引擎快，且是公认的好棋），之后交给引擎。
+引擎信息栏此时会显示「开局库」。
+
+> 库只存着法、**不存开局名**：同一局面常被多个 ECO 共用，强行贴名字会给出
+> 误导性结论（实测会出现「1.e4 e5 后叫 Bongcloud Attack」这种）。
+
+### 难度开局后锁定
+
+走出第一步后难度按钮置灰，**只有点「新对局」才解锁**。理由是走到一半换档
+等于随时给自己降难度。锁定状态由 `gameStarted` 标记，不看 `history`，
+否则一路悔棋回原点会把难度意外解锁。
+
 ### 排查：引擎没反应怎么办
 
 引擎「静默无响应」时，在浏览器控制台跑这段（**注意先 `Ctrl+Shift+R` 强刷**）：
@@ -125,12 +179,17 @@ Cross-Origin-Embedder-Policy: require-corp
 const w = new Worker('/js/lib/stockfish.js');
 w.onmessage = e => console.log('<<', String(e.data).slice(0, 70));
 w.onerror = e => console.log('ERR', e.message, e.filename, e.lineno);
-setTimeout(() => w.postMessage('uci'), 1500);
+w.postMessage('uci');
+setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8'); }, 3000);
 ```
 
-看到 `uciok` 说明引擎正常，问题在 `chess-worker.js`；
-连 banner 都没有则是脚本没加载成功，先确认 `js/lib/stockfish.js` 存在且
-服务器把它当 `application/javascript` 返回。
+- 看到 `uciok` + `bestmove` → 引擎正常，问题在 `chess-worker.js`
+- 引擎回了 `uciok` 但 `go` 无输出 → 检查有没有误发 `setoption`（见上）
+- 连 banner 都没有 → 脚本没加载成功，确认 `js/lib/stockfish.js` 存在且
+  服务器返回 `application/javascript`
+
+`chess-worker.js` 顶部有 `const DBG = true`，会在控制台打印 `[sf]` 前缀的
+收发日志（发出什么、收到什么、哪一步被丢弃），排查时非常好用。
 
 ## 本次改动（国际象棋功能）
 
