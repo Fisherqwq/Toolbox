@@ -23,6 +23,7 @@
       <nav class="nav">
         <a href="#/">首页</a>
         <a href="#/chess">国际象棋</a>
+        <a href="#/xiangqi">中国象棋</a>
         <a href="#/gomoku">五子棋</a>
         <a href="#/crypto">加密计算</a>
       </nav>
@@ -95,8 +96,8 @@
             <span class="table-icon"><iconify-icon icon="mdi:chess-rook"></iconify-icon></span>
             <h3 class="table-name">国际象棋</h3>
             <p class="table-desc">
-              走 Stockfish 19，深度 4 到 14 三档。引擎在你自己机器上跑，
-              拔网线也能下。
+              走 Stockfish 19，深度 4 到 14 三档，也能自己填深度或每步思考时间。
+              引擎在你自己机器上跑，拔网线也能下。
             </p>
             <ul class="table-facts">
               <li><b>深度 4 / 8 / 14</b><span>三档难度</span></li>
@@ -121,14 +122,22 @@
           </div>
         </a>
 
-        <a class="table-card table-card--muted" href="#/xiangqi">
+        <a class="table-card" href="#/xiangqi">
+          <img class="table-shot"
+               src="https://picsum.photos/seed/xiangqi-board/600/420"
+               alt="楚河汉界上的中国象棋残局" loading="lazy" decoding="async">
           <div class="table-body">
             <span class="table-icon"><iconify-icon icon="mdi:vector-square"></iconify-icon></span>
             <h3 class="table-name">中国象棋</h3>
             <p class="table-desc">
-              还没写。计划接 Pikafish 本地引擎 —— 现在点进去只有一句话，别抱期待。
+              走象眼（ElephantEye），搜索 4 / 6 / 8 三档，也能自己填搜索层数。
+              规则引擎用 zh-chess，将死困毙都判得对。
             </p>
-            <span class="table-tag">施工中 · 大概还得一阵</span>
+            <ul class="table-facts">
+              <li><b>搜索 4 / 6 / 8 层</b><span>三档难度</span></li>
+              <li><b>perft(3) = 79666</b><span>走法生成校验</span></li>
+            </ul>
+            <span class="table-go">摆一局<iconify-icon icon="mdi:arrow-right"></iconify-icon></span>
           </div>
         </a>
       </div>
@@ -234,16 +243,124 @@
       </div>
     </section>
 
-    <!-- 棋类占位视图 -->
+    <!-- 中国象棋视图 -->
     <section id="view-xiangqi" class="view hidden">
       <a href="#/" class="back-link">
         <iconify-icon icon="mdi:arrow-left"></iconify-icon> 回首页
       </a>
       <div class="view-head">
         <h2>中国象棋</h2>
-        <p>还没写完，计划接 Pikafish 本地引擎。先占个位，别在这儿耗时间。</p>
+        <p>你执红先行，走子点两下：先点棋子，再点落点。AI 走象眼引擎，全在你本机跑。</p>
+      </div>
+
+      <div class="xq-layout">
+        <div class="xq-board-frame">
+          <canvas id="xqCanvas" width="640" height="640"></canvas>
+        </div>
+
+        <aside class="xq-side-panel">
+          <div class="xq-card xq-status-card">
+            <div class="xq-turn-indicator">
+              <span class="xq-turn-dot" id="xqTurnDot"></span>
+              <span id="xqStatusText">加载中…</span>
+              <span class="xq-thinking" id="xqThinkingIndicator"><i></i><i></i><i></i></span>
+            </div>
+            <div class="xq-move-meta">
+              <span>第 <b id="xqMoveCount">0</b> 回合</span>
+              <span class="xq-last-move" id="xqLastMove">—</span>
+            </div>
+          </div>
+
+          <div class="xq-card">
+            <div class="xq-card-title">引擎</div>
+            <div class="xq-engine-badge warn" id="xqEngineBadge">检测中…</div>
+            <div class="xq-engine-info" id="xqEngineInfo">—</div>
+            <!-- 评估分数默认收起，展开才看。理由同国际象棋那边：
+                 深度照常显示（它是进度反馈），只把「谁更优」藏起来。 -->
+            <button type="button" class="xq-engine-toggle" id="xqEvalToggle"
+                    aria-expanded="false" aria-controls="xqEvalBox">查看评估 ▼</button>
+            <div class="xq-engine-eval" id="xqEvalBox">
+              <div class="xq-engine-eval-row"><span>评估</span><b class="xq-engine-eval-value" id="xqEvalScore">—</b></div>
+            </div>
+            <p class="xq-card-hint">
+              需要 <code>js/lib/eleeye/</code> 下的 <code>eleeye.js</code> +
+              <code>eleeye.wasm</code>，两个文件共 174 KB。缺一个都跑不起来。
+            </p>
+            <div class="xq-engine-help hidden" id="xqEngineHelp">
+              <div class="xq-engine-help-title">缺少象眼引擎</div>
+              <p class="xq-engine-help-text">
+                从上游下载 <code>eleeye.js</code> 与 <code>eleeye.wasm</code>，
+                放进 <code>js/lib/eleeye/</code> 目录后点「重新检测」。
+              </p>
+              <a class="xq-btn xq-btn-primary xq-engine-download"
+                 id="xqEngineDownload"
+                 href="https://github.com/billzi2016/Chinese-Chess-AI"
+                 target="_blank" rel="noopener noreferrer">前往下载象眼</a>
+              <button type="button" class="xq-btn xq-btn-ghost" id="xqEngineRetry">重新检测</button>
+            </div>
+            </div>
+<div class="xq-card">
+            <div class="xq-card-title">难度</div>
+            <div class="xq-difficulty" id="xqDepthGroup">
+              <button type="button" class="xq-diff-btn" data-preset="easy" data-hint="搜索 4 层">初级</button>
+              <button type="button" class="xq-diff-btn active" data-preset="normal" data-hint="搜索 6 层">中级</button>
+              <button type="button" class="xq-diff-btn" data-preset="hard" data-hint="搜索 8 层">高级</button>
+              <button type="button" class="xq-diff-btn" data-preset="custom" data-hint="自己填搜索层数">自定义</button>
+            </div>
+
+            <!-- 自定义难度：只有一个参数 —— 搜索层数。
+                 象眼引擎没有限强选项，也只认 `go depth`（实测 go movetime 不返回），
+                 所以「棋力等级」「每步思考时间」这类开关一律不做，
+                 摆一个不生效的输入框比没有更糟。 -->
+            <div class="xq-diff-custom hidden" id="xqCustomDiff">
+              <div class="xq-diff-row" data-field="depth">
+                <label class="xq-diff-label" for="xqCustomDepth">搜索深度</label>
+                <input type="number" class="xq-diff-input" id="xqCustomDepth"
+                       min="1" max="30" step="1" value="10" inputmode="numeric">
+                <span class="xq-diff-unit">层</span>
+              </div>
+            </div>
+
+            <p class="xq-card-hint" id="xqDepthHint">正在检测引擎…</p>
+          </div>
+
+          <div class="xq-card">
+            <div class="xq-card-title">对局</div>
+            <div class="xq-actions">
+              <button type="button" class="xq-btn xq-btn-primary" id="xqRestartBtn">新对局</button>
+              <button type="button" class="xq-btn" id="xqUndoBtn" disabled>悔棋</button>
+            </div>
+            <div class="xq-actions xq-actions-secondary">
+              <button type="button" class="xq-btn xq-btn-ghost" id="xqFlipBtn">翻转棋盘</button>
+              <button type="button" class="xq-btn xq-btn-ghost" id="xqCopyFenBtn">复制 FEN</button>
+            </div>
+            <div class="xq-scoreboard">
+              <div class="xq-score-item">
+                <span class="xq-score-name">红</span>
+                <b id="xqRedScore">0</b>
+              </div>
+              <span class="xq-score-divider">:</span>
+              <div class="xq-score-item">
+                <b id="xqBlackScore">0</b>
+                <span class="xq-score-name">黑</span>
+              </div>
+              <div class="xq-score-item xq-score-draw">
+                <span class="xq-score-name">和</span>
+                <b id="xqDrawScore">0</b>
+              </div>
+            </div>
+          </div>
+
+          <div class="xq-card">
+            <button type="button" class="xq-history-toggle" id="xqHistoryToggle">走子记录 ▼</button>
+            <div class="xq-history-list" id="xqHistoryList">
+              <div class="xq-history-empty">还没有走子</div>
+            </div>
+          </div>
+        </aside>
       </div>
     </section>
+          </div>
     <section id="view-chess" class="view hidden">
       <a href="#/" class="back-link">
         <iconify-icon icon="mdi:arrow-left"></iconify-icon> 回首页
@@ -276,6 +393,14 @@
             <div class="chess-card-title">引擎</div>
             <div class="chess-engine-badge warn" id="chessEngineBadge">检测中…</div>
             <div class="chess-engine-info" id="chessEngineInfo">—</div>
+            <!-- 评估分数默认收起：分数在搜索中一路跳，常年摊在侧栏纯属干扰。
+                 深度照常显示（那是进度反馈），只把分数藏起来。 -->
+            <button type="button" class="chess-score-toggle" id="chessScoreToggle"
+                    aria-expanded="false" aria-controls="chessScoreBox">评估 ▼</button>
+            <div class="chess-score-box" id="chessScoreBox">
+              <span class="chess-score-label">评估分数</span>
+              <b class="chess-score-value" id="chessScoreValue">—</b>
+            </div>
             <p class="chess-card-hint">
               需要 <code>js/lib/stockfish.js</code> + <code>js/lib/stockfish.wasm</code>。
               没装就没法对弈，下面可直接下载。
@@ -300,7 +425,31 @@
               <button type="button" class="chess-diff-btn" data-preset="easy" data-hint="Stockfish 深度 4">简单</button>
               <button type="button" class="chess-diff-btn active" data-preset="normal" data-hint="Stockfish 深度 8">中等</button>
               <button type="button" class="chess-diff-btn" data-preset="hard" data-hint="Stockfish 深度 14">困难</button>
+              <button type="button" class="chess-diff-btn" data-preset="custom" data-hint="自己填深度或每步时间">自定</button>
             </div>
+
+            <!-- 自定义难度：预设只给三档，这里让玩家直接填数字。
+                 两套参数互斥：worker 里 go depth 优先于 go movetime，
+                 同时给会让 movetime 被吃掉，所以界面也只让选一个。 -->
+            <div class="chess-diff-custom hidden" id="chessCustomDiff">
+              <div class="chess-diff-modes" id="chessDiffModeGroup">
+                <button type="button" class="chess-diff-mode active" data-mode="depth">按深度</button>
+                <button type="button" class="chess-diff-mode" data-mode="time">按时间</button>
+              </div>
+              <div class="chess-diff-row" data-field="depth">
+                <label class="chess-diff-label" for="chessCustomDepth">搜索深度</label>
+                <input type="number" class="chess-diff-input" id="chessCustomDepth"
+                       min="1" max="40" step="1" value="12" inputmode="numeric">
+                <span class="chess-diff-unit">层</span>
+              </div>
+              <div class="chess-diff-row hidden" data-field="time">
+                <label class="chess-diff-label" for="chessCustomTime">每步思考</label>
+                <input type="number" class="chess-diff-input" id="chessCustomTime"
+                       min="100" max="60000" step="100" value="1000" inputmode="numeric">
+                <span class="chess-diff-unit">毫秒</span>
+              </div>
+            </div>
+
             <p class="chess-card-hint" id="chessDepthHint">正在检测引擎…</p>
           </div>
 
@@ -424,6 +573,10 @@
   <script src="js/lucky.js"></script>
   <script src="js/crypto-tools.js"></script>
   <script src="js/gomoku.js"></script>
+  <!-- 中国象棋：规则引擎（zh-chess，MIT）提供走法生成与合法性判定，
+       棋盘绘制与对局流程在 js/xiangqi.js，AI 走象眼 ElephantEye -->
+  <script src="js/xiangqi-engine/zh-chess.browser.min.js"></script>
+  <script src="js/xiangqi.js"></script>
   <script type="module" src="js/chess-bridge.js"></script>
   <script src="js/chess-book.js"></script>
   <script src="js/chess.js"></script>

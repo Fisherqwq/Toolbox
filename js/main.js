@@ -20,6 +20,10 @@
   if (name === 'chess' && window.ChessApp) {
     setTimeout(() => window.ChessApp.init(), 50);
   }
+  // 中国象棋：init 内部有 initialized 幂等保护，切回页面重复调用安全
+  if (name === 'xiangqi' && window.XiangqiApp) {
+    setTimeout(() => window.XiangqiApp.init(), 50);
+  }
   window.scrollTo(0, 0);
 }
 

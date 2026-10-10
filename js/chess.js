@@ -5,8 +5,8 @@
  * Worker 承担思考、gen 计数器丢弃过期结果。
  *
  * 引擎只有 Stockfish 一个后端（js/chess-worker.js，经典 worker），
- * 依赖 js/lib/stockfish.js —— 单文件 asm.js 构建，二进制已内嵌，
- * 不需要额外的 .wasm 文件，也不需要 COOP/COEP 响应头。
+ * 依赖 js/lib/stockfish.js + js/lib/stockfish.wasm（v19 lite-single，
+ * NNUE 权重已内嵌）。单线程构建，不需要 COOP/COEP 响应头。
  * 简易引擎已删除：没有引擎文件时明确报错并给出下载指引，不做静默降级。
  */
 (function () {
@@ -65,8 +65,8 @@
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const ENGINE_JS = 'js/lib/stockfish.js';
-  // 引擎的 wasm 也要在位：Niklas Fiekas 的构建靠 scriptDirectory
-  // 从脚本同目录自动取 stockfish.wasm，缺了它引擎起不来。
+  // wasm 也必须在位：Stockfish.js 19 lite-single 是 js + wasm 两个文件，
+  // 缺了 wasm 引擎脚本能加载却没有二进制可实例化。
   const ENGINE_WASM = 'js/lib/stockfish.wasm';
   const ENGINE_URL = 'https://github.com/nmrugg/stockfish.js/releases';
 
@@ -103,6 +103,7 @@
   let engineReady = false;
   let badgeText = '检测中…';       // 引擎徽标文案（与样式解耦，便于 ready 后重绘）
   let badgeWarn = true;
+  let badgeLoading = false;        // 徽标处于「加载中」而非「真出错」
   let thinkTimer = null;           // 思考看门狗定时器
   let pendingPromotion = null;     // 升变选择器：{ from, to }
 
@@ -130,6 +131,30 @@
     hard:   20000,
   };
   let preset = 'normal';
+
+  /**
+   * 自定义难度。
+   *
+   * 为什么深度和时间只能二选一：worker 的 go 分支是
+   *   depth 优先 → depth 不存在才看 movetime，
+   * 两个都给的话 movetime 会被直接吃掉，界面上看着「我设了时间」
+   * 实际完全没生效。所以这里做成互斥，模式切换只暴露一个输入框。
+   */
+  const CUSTOM = {
+    // 按深度：UCI 深度上限，1..40。超过 ~30 在浏览器里基本跑不完，
+    // 但仍允许填满 40 —— 有人就想挂着算一整步，引擎会一直算到那个深度。
+    depth: 12,
+    // 按时间：每步思考上限（毫秒），100..60000。
+    // 下限 100ms 是有意的：低于这个值引擎连初始化搜索都做不完，
+    // 会交出 `bestmove 0000`，主线程只能报「引擎未返回着法」。
+    timeMs: 1000,
+    mode: 'depth',            // depth | time
+  };
+
+  const CUSTOM_LIMITS = {
+    depth: { min: 1, max: 40 },
+    timeMs: { min: 100, max: 60000 },
+  };
 
   const $ = (id) => document.getElementById(id);
   const sqName = (file, rank) => FILES[file] + (rank + 1);
@@ -584,9 +609,50 @@
    * 引擎
    * ============================================================ */
 
-  /** 当前预设对应的 Stockfish 搜索深度 */
+  /**
+   * 当前生效的搜索深度。
+   *
+   * 自定义 + 按时间时返回 null —— 这是「不要深度上限，只按时间算」的信号，
+   * worker 那边 `data.depth` 为空就会落到 `go movetime`。
+   */
   function currentDepth() {
+    if (preset === 'custom') {
+      return CUSTOM.mode === 'depth' ? CUSTOM.depth : null;
+    }
     return DIFFICULTY[preset] || DIFFICULTY.normal;
+  }
+
+  /**
+   * 当前生效的每步思考上限（毫秒）。
+   *
+   * 深度模式下这是个**兜底**上限：绝大多数情况 depth 先到（实测深度 8 只要 0.3 秒），
+   * 只有机器特别慢时才会让 movetime 生效，用来保证一定交得出着法。
+   * 自定义 + 按时间时它才是真正的限制。
+   */
+  function currentMoveTime() {
+    if (preset === 'custom') {
+      if (CUSTOM.mode === 'time') return CUSTOM.timeMs;
+      // 深度模式：给一个宽裕的兜底，按深度粗略估算，慢机器也不会卡死
+      return Math.max(2000, CUSTOM.depth * 1500);
+    }
+    return MOVE_TIME_MS[preset] || MOVE_TIME_MS.normal;
+  }
+
+  /**
+   * 把玩家填的值夹进合法区间。
+   *
+   * 空字符串要单独判掉，不能靠 Number()：Number('') 是 0 且 isFinite(0) 为真，
+   * 会被当成合法值夹到下限（深度 1 / 时间 100ms）—— 也就是「清空输入框」
+   * 悄悄把难度改成了最弱。空值与非数字一律回落到当前值。
+   * 绝不能返回 0：movetime 0 会让引擎直接交 bestmove 0000。
+   */
+  function clampCustom(field, raw) {
+    const lim = CUSTOM_LIMITS[field];
+    if (!lim) return CUSTOM[field];
+    if (raw === '' || raw === null || raw === undefined) return CUSTOM[field];
+    const n = Math.round(Number(raw));
+    if (!Number.isFinite(n)) return CUSTOM[field];
+    return Math.min(lim.max, Math.max(lim.min, n));
   }
 
   /**
@@ -652,6 +718,7 @@
       // 真正握手成功（收到 ready）之后才算加载完成，否则引擎起不来时
       // 侧栏会一直谎报「已加载」而实际上 AI 永远不动。
       showEngineBadge('正在加载 Stockfish…', true);
+      badgeLoading = true;
       setEngineMissingHint(false);
       spawnEngine();
     } else {
@@ -681,7 +748,7 @@
     worker.onerror = (e) => {
       console.error('[chess] 引擎线程出错:', e.message || e);
       engineReady = false;
-      renderBadge();
+      badgeLoading = false;
       showEngineBadge('Stockfish 启动失败', true);
       // 文件存在才会走到这里，所以不弹下载面板
       setEngineMissingHint(false);
@@ -696,6 +763,9 @@
 
   function initEngineState() {
     engineReady = false;
+    // 重置 worker 时把「加载中」状态清掉，避免之后 ready 到来时
+    // 徽标因为标志位残留而无法转绿。
+    badgeLoading = false;
     renderBadge();
     if (worker) worker.postMessage({ type: 'init', data: { gen, fen: game.fen() } });
   }
@@ -765,9 +835,10 @@
       data: {
         gen,
         fen: game.fen(),
+        // 按时间模式下这里是 null，worker 会落到 `go movetime`。
         depth: currentDepth(),
         // 同时给 movetime：慢机器上到点必定交着法，不会干等到看门狗超时。
-        movetime: MOVE_TIME_MS[preset] || MOVE_TIME_MS.normal,
+        movetime: currentMoveTime(),
       },
     });
     setEngineThinking(true);
@@ -782,6 +853,11 @@
   function armThinkWatchdog() {
     disarmThinkWatchdog();
     const startGen = gen;
+    // 看门狗必须长于「引擎合法可能花的时间」，否则自定义大时间一到点
+    // 就被误判成引擎无响应：玩家设 60000ms 慢慢等，结果等的是看门狗。
+    // 给 2 倍余量 + 10s 收尾开销；深度模式下 currentMoveTime() 只是兜底，
+    // 但深度也可能很慢，所以仍然取两者的较大值。
+    const budget = Math.max(60000, currentMoveTime() * 2 + 10000);
     thinkTimer = setTimeout(() => {
       thinkTimer = null;
       if (startGen !== gen || !thinking) return;      // 已经换局 / 已经走完
@@ -790,7 +866,7 @@
       setEngineThinking(false);
       setStatus('引擎无响应，请点「新对局」重试', true);
       updateControls();
-    }, 60000);
+    }, budget);
   }
 
   function disarmThinkWatchdog() {
@@ -811,7 +887,12 @@
       engineReady = true;
       // 握手成功此刻才成立。worker 被创建不等于引擎可用，
       // 之前无条件写死「已加载」会让引擎起不来时侧栏一直谎报。
-      if (!badgeWarn) {
+      //
+      // 但要区分「加载中」和「真出错」：
+      // setupEngine() 展示的「正在加载 Stockfish…」本身也带 warn=true，
+      // 若只看 badgeWarn 就永远判成出错，徽标会一直卡在黄色不转绿。
+      if (badgeLoading) {
+        badgeLoading = false;
         showEngineBadge('已加载 · Stockfish', false);
       } else {
         renderBadge();
@@ -825,7 +906,7 @@
       // 这时**不能**弹下载面板——文件明明在，再点下载也没用，
       // 反而会让用户以为文件没放好。改为提示换服务器 / 重试。
       engineReady = false;
-      renderBadge();
+      badgeLoading = false;
       showEngineBadge('Stockfish 启动失败', true);
       setEngineMissingHint(false);
       setStatus('Stockfish 启动失败（' + ((data && data.reason) || '未知原因')
@@ -837,7 +918,17 @@
     }
     if (type === 'info') {
       if (data.gen !== gen) return;                 // 过期
-      if (data.depth) setEngineInfo('深度 ' + data.depth + (data.score !== undefined ? ' · 评估 ' + formatScore(data) : ''));
+      if (!data.depth) return;
+      setEngineInfo('深度 ' + data.depth);
+      // 分数单独走，写进默认收起的面板（点「查看评估」才看得见）。
+      //
+      // 这里顺手修了个老 bug：原来判的是 `data.score !== undefined`，
+      // 但 Stockfish 报杀棋时给的是 `score mate N`，**score 字段根本不存在**
+      // （见 chess-worker.js 的 parseInfo：cp 进 score，mate 进 mate）。
+      // 所以「将军 / 杀棋」从来没显示过评估值。两个字段都得判。
+      if (data.score !== undefined || data.mate !== undefined) {
+        setEngineScore(formatScore(data), data);
+      }
       return;
     }
     if (type === 'bestmove') {
@@ -939,6 +1030,35 @@
     if (el) el.textContent = text;
   }
 
+  /**
+   * 评估分数：写进**默认收起**的面板（点「评估 ▼」才展开）。
+   *
+   * 为什么藏：深度是「算到第几层」，属于进度反馈，盯着无害；
+   * 分数是「谁更优」，搜索途中一路跳，常年摊在侧栏会让人下意识
+   * 照着分数下棋，反而不看局面了。所以它是「想看才看」的信息。
+   *
+   * 收起时照样更新 —— 只在展开那一刻才写的话，展开会看到空值或旧值。
+   */
+  function setEngineScore(text, info) {
+    const el = $('chessScoreValue');
+    if (!el || !text) return;
+    el.textContent = text;
+    // 分数已是白方视角（worker 的 toWhiteScore 归一化过），正=白优。
+    const v = (info.mate !== undefined && info.mate !== null)
+      ? info.mate
+      : (info.score || 0) / 100;
+    el.classList.toggle('adv', v > 0);
+    el.classList.toggle('dis', v < 0);
+  }
+
+  /** 清空分数：新对局 / 悔棋时用，避免留着上一手的评估值 */
+  function resetEngineScore() {
+    const el = $('chessScoreValue');
+    if (!el) return;
+    el.textContent = '—';
+    el.classList.remove('adv', 'dis');
+  }
+
   /** 记录徽标文案/告警态（真正上色交给 renderBadge，便于 ready 后重绘） */
   function showEngineBadge(text, warn) {
     badgeText = text;
@@ -955,11 +1075,70 @@
     el.classList.toggle('ok', !badgeWarn && engineReady);
   }
 
-  /** 难度提示：只有 Stockfish 一套深度 */
+  /**
+   * 难度提示：显示**实际生效**的参数，而不是预设名。
+   *
+   * 自定义模式下必须回显夹紧后的真值：玩家填 999 层，看到「深度 40」
+   * 才知道自己被夹了。只写「自定义」等于让人猜引擎到底在算什么。
+   */
   function updateDepthHint() {
     const el = $('chessDepthHint');
     if (!el) return;
-    el.textContent = 'Stockfish 深度 ' + currentDepth();
+    let base;
+    if (preset === 'custom') {
+      base = CUSTOM.mode === 'time'
+        ? 'Stockfish 每步最多 ' + formatMs(CUSTOM.timeMs)
+        : 'Stockfish 深度 ' + CUSTOM.depth;
+    } else {
+      base = 'Stockfish 深度 ' + currentDepth();
+    }
+    el.textContent = gameStarted ? base + ' · 开局后锁定，点「新对局」可换' : base;
+  }
+
+  /**
+   * 重绘自定义难度面板：显隐、模式高亮、输入框回填与越界标红。
+   *
+   * 单独抽出来是因为改难度有三条入口（预设按钮 / 模式按钮 / 数字输入），
+   * 每条都要同步这几个控件，散着写必然漏掉一处 —— 而漏掉的后果是
+   * 「界面显示 40 层、引擎其实在跑 12 层」这种静默错配。
+   */
+  function renderCustomPanel() {
+    const panel = $('chessCustomDiff');
+    if (!panel) return;
+    panel.classList.toggle('hidden', preset !== 'custom');
+
+    const modes = $('chessDiffModeGroup');
+    if (modes) {
+      modes.querySelectorAll('.chess-diff-mode').forEach((b) => {
+        b.classList.toggle('active', b.dataset.mode === CUSTOM.mode);
+      });
+    }
+    // 两套输入框互斥显示：worker 里 depth 会盖掉 movetime，
+    // 两个都摆出来只会让人以为设的时间也生效。
+    panel.querySelectorAll('.chess-diff-row').forEach((row) => {
+      row.classList.toggle('hidden', row.dataset.field !== CUSTOM.mode);
+    });
+
+    [['chessCustomDepth', 'depth'], ['chessCustomTime', 'timeMs']].forEach((pair) => {
+      const input = $(pair[0]);
+      if (!input) return;
+      const lim = CUSTOM_LIMITS[pair[1]];
+      const typed = Number(input.value);
+      // 空值是「正在打字或刚清空」的中间态：既不回填、也不标红，
+      // 否则玩家清空重输时会被立刻塞回旧值，光标反复跳。
+      if (input.value !== '' && Number.isFinite(typed)) {
+        input.value = CUSTOM[pair[1]];
+        // 越界标红：让玩家看见「我填的」和「实际生效的」不是一回事
+        input.classList.toggle('invalid', typed < lim.min || typed > lim.max);
+      } else {
+        input.classList.remove('invalid');
+      }
+    });
+  }
+
+  /** 毫秒转成人话：1500 -> 1.5 秒，60000 -> 60 秒 */
+  function formatMs(ms) {
+    return (ms / 1000) + ' 秒';
   }
 
   /** 回合指示点：跟着当前行棋方变色 */
@@ -1000,19 +1179,20 @@
    * 不看 history，否则一路悔棋回原点会把难度意外解锁。
    */
   function updateDifficultyLock() {
-    const group = $('chessDepthGroup');
-    if (!group) return;
     const lock = gameStarted;
-    group.querySelectorAll('.chess-diff-btn').forEach((b) => { b.disabled = lock; });
-    const hint = $('chessDepthHint');
-    if (hint && lock) {
-      // 锁定时把「可调」的说法换成实际值，避免玩家以为按钮失灵了
-      const base = hint.dataset.base || hint.textContent;
-      hint.dataset.base = base;
-      hint.textContent = base + ' · 开局后锁定，点「新对局」可换';
-    } else if (hint && hint.dataset.base) {
-      hint.textContent = hint.dataset.base;
-    }
+    const group = $('chessDepthGroup');
+    if (group) group.querySelectorAll('.chess-diff-btn').forEach((b) => { b.disabled = lock; });
+    // 自定义面板里的按钮和输入框同样要锁：只锁预设按钮的话，
+    // 选了「自定」之后玩家还能继续改数字，难度就等于没锁。
+    const modes = $('chessDiffModeGroup');
+    if (modes) modes.querySelectorAll('.chess-diff-mode').forEach((b) => { b.disabled = lock; });
+    ['chessCustomDepth', 'chessCustomTime'].forEach((id) => {
+      const el = $(id);
+      if (el) el.disabled = lock;
+    });
+    // 锁定文案由 updateDepthHint 统一拼（它才知道实际参数），
+    // 这里只负责触发一次重绘。
+    updateDepthHint();
   }
 
   function loadScores() {
@@ -1054,6 +1234,7 @@
     orientation = 'w';
     setEngineThinking(false);
     setEngineInfo('—');
+    resetEngineScore();
     buildBoardBackground();
     render();
     updateMoveCount();
@@ -1077,6 +1258,7 @@
     clearSelection();
     gameOver = false;
     setEngineInfo('—');
+    resetEngineScore();
     updateMoveCount();
     updateLastMoveText();
     updateStatus();
@@ -1129,11 +1311,40 @@
         group.querySelectorAll('.chess-diff-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         preset = btn.dataset.preset;
-        updateDepthHint();
+        renderCustomPanel();
+        updateDifficultyLock();     // 顺带重绘锁定态与提示
         // 正在思考时切难度：让新深度对下一手生效
         if (thinking) stopEngine();
       });
     }
+
+    // 自定义难度：模式切换（按深度 / 按时间）
+    const modeGroup = $('chessDiffModeGroup');
+    if (modeGroup) {
+      modeGroup.addEventListener('click', (e) => {
+        const btn = e.target.closest('.chess-diff-mode');
+        if (!btn || btn.disabled) return;
+        CUSTOM.mode = btn.dataset.mode === 'time' ? 'time' : 'depth';
+        renderCustomPanel();
+        updateDifficultyLock();
+        if (thinking) stopEngine();
+      });
+    }
+
+    // 自定义难度：数字输入。用 input 事件即时生效（键入和滚轮都跟手），
+    // change 只做一次收尾规范化 —— 否则边打字边被夹紧，光标位置会乱跳。
+    [['chessCustomDepth', 'depth'], ['chessCustomTime', 'timeMs']].forEach((pair) => {
+      const input = $(pair[0]);
+      const field = pair[1];
+      if (!input) return;
+      input.addEventListener('input', () => {
+        CUSTOM[field] = clampCustom(field, input.value);
+        renderCustomPanel();
+        updateDifficultyLock();
+      });
+      // 失焦时把填错的（比如留个空）修正回真值
+      input.addEventListener('change', () => { input.value = CUSTOM[field]; });
+    });
 
     // 升变选择器
     const promo = $('chessPromotion');
@@ -1163,6 +1374,20 @@
           retry.disabled = false;
           retry.textContent = '重新检测';
         }
+      });
+    }
+
+    // 侧栏：评估分数（默认收起）
+    // 文案和 aria-expanded 一起同步：只改样式不改文案的话，
+    // 读屏用户听到的永远是「收起」。
+    const scoreToggle = $('chessScoreToggle');
+    if (scoreToggle) {
+      scoreToggle.addEventListener('click', () => {
+        const box = $('chessScoreBox');
+        if (!box) return;
+        const open = box.classList.toggle('open');
+        scoreToggle.textContent = open ? '收起评估 ▲' : '评估 ▼';
+        scoreToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
     }
 

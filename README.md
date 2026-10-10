@@ -71,19 +71,39 @@ node js/chess-engine/test.mjs
 该脚本包含 4 组 perft 标准局面（初始局面、Kiwipete、Position3/4）以及
 终局判定、FEN、兼底引擎等共 **49 项断言**，全部通过。
 
+难度相关的另外两套（同样直接跑 `js/chess.js` / `js/chess-worker.js` 的**真源**
+函数，而不是复刻一份逻辑——复刻的那份迟早和实际跑的那份分叉）：
+
+```bash
+node tools/test-difficulty.mjs      # 73 项：夹取边界、depth/movetime 映射、watchdog、HTML/CSS 契约
+node tools/test-difficulty-dom.mjs  # 25 项：面板显隐、锁定/解锁、越界回显（零依赖 DOM stub）
+```
+
 ### AI 引擎
 
-引擎在 `js/lib/stockfish.js`，**单文件 asm.js 构建，约 1.5 MB，二进制已内嵌**。
+引擎是 **Stockfish.js v19.0.0 `lite-single`**（单线程 lite 版），两个文件：
 
-几个关键特性（都是踩过坑之后定下来的，改动前务必读完）：
+| 文件 | 大小 | 说明 |
+| --- | --- | --- |
+| `js/lib/stockfish.js` | 21 KB | 引擎胶水脚本 |
+| `js/lib/stockfish.wasm` | 1.7 MB | 引擎本体，NNUE 权重已**内嵌**，无需额外 `.nnue` |
 
-- **不需要额外的 `.wasm` 文件**。旧版 wasm 构建要 `stockfish.js` + `stockfish.wasm` 两个文件，
-  且靠 URL 上的 `#<wasm名>,worker` 后缀让引擎拼出 `locateFile`。asm.js 版把这套去掉了：
-  它的 `locateFile` 就是 `function(file){ return file }`，**加 hash 反而可能干扰解析**。
-- **不需要 COOP/COEP 响应头**。这是单线程版，没用到 `SharedArrayBuffer`，
-  所以静态服务器（`python -m http.server`、VS Code Live Server）直接就能跑。
-  只有多线程版才需要那两个头，见下方「想换多线程版」。
+几个关键特性（踩过坑之后定下来的，改动前务必读完）：
+
+- ⚠ **不要加 `#stockfish.wasm,worker` 后缀**。引擎源码里确实有
+  `self.location.hash.split(',')[1] === 'worker'` 这段判断，但命中它会走进一条
+  早期特殊分支，实测在浏览器里彻底卡死：worker 脚本加载成功、无 `onerror`，
+  但一个字节都不输出，`uciok` 永不回来。**不带 hash 反而正常** —— 引擎转而用
+  `typeof importScripts === 'function'` 识别 Worker 环境。A/B 实测确认。
+- ⚠ **启动时有界重发 `uci`**。该构建的启动函数跑在 `onmessage` 赋值**之前**，
+  立刻发出的 `uci` 可能被丢弃，所以 `boot()` 里每 0.9s 重发一次，拿到 `uciok` 立即停止。
+- **就绪判据是 `uciok`，不是 `readyok`**。`uciok` 一到就 `flush()` 放出排队的
+  `position` / `go`；等 `readyok` 会因为时序把状态机卡死（队列永远滞留 → AI 不走子）。
+- **不需要 COOP/COEP 响应头**。单线程版没用到 `SharedArrayBuffer`，
+  `python -m http.server`、VS Code Live Server 直接就能跑。只有多线程版才需要那两个头。
 - **必须是经典 Worker**，不能 `{ type: 'module' }`：引擎依赖 `importScripts`，而 module worker 没有这个函数。
+- **`go depth` 优先于 `go movetime`**。`movetime` 是时间上限不是目标，Stockfish 会用满才停；
+  深度 8 只要 0.3 秒而 `movetime 8000` 会让每步硬等 8 秒。`movetime` 仅作慢机器兜底。
 
 页面启动时会 `HEAD` 探测 `js/lib/stockfish.js`（拿不准时用 `GET` 复核，
 避免服务器对 `HEAD` 返回 405 造成误判）：
@@ -96,9 +116,8 @@ node js/chess-engine/test.mjs
 简易引擎已删除：棋力太弱，且曾因未同步局面导致 AI 走出非法着法。
 现在没有 Stockfish 就没有对手，页面会明确报错并给出下载入口，不做静默降级。
 
-**换引擎**：把上游的单文件 asm.js 构建放到 `js/lib/stockfish.js` 即可，
-页面代码无需改动。若换回 wasm 构建，则需要同时放回 `stockfish.wasm`
-并把 `chess-worker.js` 里的 `new Worker(ENGINE_URL)` 改回带 hash 的形式。
+**换引擎**：把上游构建的 `stockfish.js` + `stockfish.wasm` 一起放进 `js/lib/` 即可，
+页面代码无需改动（只要沿用「**不要**加 hash 后缀 + 就绪判据是 `uciok`」这两条约定）。
 
 ### 想换多线程版？
 
@@ -165,11 +184,34 @@ AI 在**前 8 个回合**优先走库（比引擎快，且是公认的好棋）�
 > 库只存着法、**不存开局名**：同一局面常被多个 ECO 共用，强行贴名字会给出
 > 误导性结论（实测会出现「1.e4 e5 后叫 Bongcloud Attack」这种）。
 
+### 自定义难度（深度或时间）
+
+难度卡里除了简单 / 中等 / 困难（对应深度 4 / 8 / 14），还有第四档「自定」，
+可以自己填**搜索深度**（1–40 层）或**每步思考时间**（100–60000 毫秒），
+两种模式互斥切换。
+
+**为什么必须二选一**：worker 的 `go` 分支是 `depth` 优先，只有 `depth` 为空
+才看 `movetime`。两个都发给引擎，`movetime` 会被静默丢掉 —— 界面上看着
+「我设了 5 秒」，实际引擎在按深度跑。所以「按时间」模式下 `currentDepth()`
+返回 `null`，而不是同时给两个参数。`tools/test-difficulty.mjs` 里有一条
+反证断言专门守着这个坑。
+
+取值一律先夹紧再回显（`clampCustom`）：填 999 层会回显成 40 并标红，
+让人看见「我填的」和「实际生效的」不是一回事。空值单独判掉，
+因为 `Number('') === 0` 且 `isFinite(0) === true`，否则清空输入框会
+悄悄把难度改成最弱。
+
+思考看门狗跟着 movetime 走（`max(60000, movetime * 2 + 10000)`），
+否则设成 60 秒慢慢等时，到点的是看门狗而不是引擎。
+
 ### 难度开局后锁定
 
-走出第一步后难度按钮置灰，**只有点「新对局」才解锁**。理由是走到一半换档
-等于随时给自己降难度。锁定状态由 `gameStarted` 标记，不看 `history`，
-否则一路悔棋回原点会把难度意外解锁。
+走出第一步后难度按钮、模式切换、数字输入框**全部**置灰，**只有点「新对局」
+才解锁**。理由是走到一半换档等于随时给自己降难度。锁定状态由 `gameStarted`
+标记，不看 `history`，否则一路悔棋回原点会把难度意外解锁。
+
+锁定文案由 `updateDepthHint()` 统一拼（只有它知道实际生效参数），
+不再用 `hint.dataset.base` 缓存 —— 那套在切到自定义后会与真实值脱节。
 
 ### 排查：引擎没反应怎么办
 
@@ -191,44 +233,65 @@ setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8
 `chess-worker.js` 顶部有 `const DBG = true`，会在控制台打印 `[sf]` 前缀的
 收发日志（发出什么、收到什么、哪一步被丢弃），排查时非常好用。
 
-## 本次改动（国际象棋功能）
+## 交接说明（给接手的人 / AI）
 
-新增：
+### 本次会话做了什么
 
-- `js/chess-engine/`：`chess.js`（规则）、`chess.js.LICENSE`、
-  `test.mjs`（规则回归测试）
-- `js/lib/`：`stockfish.js`、`stockfish.wasm`、`README.md`
-- `js/chess.js`、`js/chess-bridge.js`、`js/chess-worker.js`
+**A. 国际象棋的 4 个真 bug（都已修，都有回归验证）**
 
-已删除：
+| # | 问题 | 根因 | 修法 |
+| --- | --- | --- | --- |
+| 1 | 点击区域比棋盘少一格 | `eventToSquare` 把格子的**左边缘**当成中心（`Math.round` + 用 `cellX()` 当中心校验），每格只有左半边可点，最右一整列完全点不到 | 改用 `Math.floor` + 格子中心 ±半格容差 |
+| 2 | 棋盘上下颠倒 | `cellY(rank)` 让 rank 1 画在顶部 | 新增 `boardToScreen()` 变换，统一渲染与命中检测共用 |
+| 3 | 翻转棋盘功能失效 | `render()` 直接拿棋盘坐标当屏幕坐标，从不调用变换函数；于是棋子不动、但点击映射翻了 | 同上，5 处渲染点全部走 `cellOf()` |
+| 4 | 坐标标签错位 | 标签画在格子左上角而非中心 | 标签与格子中心对齐 |
 
-- `js/chess-fallback-worker.js`（简易引擎 worker）
-- `js/chess-engine/eval.js`（简易引擎本体）
+坐标变换验证：两种朝向 × 64 格，渲染位置与命中检测**逐格一致**。
 
-修改：
+**B. 棋子换成 chess.com 同款**
 
-- `index.html`
-  - 填充原先的 `#view-chess` 占位视图为完整对局界面
-  - 引入 `chess-bridge.js`（module）与 `chess.js`
-  - 首页卡片改用五子棋页面的视觉风格（22px 圆角、图标底座、状态标签）
-  - 修正缩进错乱的 `crypto-entry-wrap` 块
-- `js/main.js`
-  - `showView()` 增加 `#/chess` 的 init 钩子
-- `css/style.css`
-  - 新增 `.chess-*` 全套样式（与 `.gomoku-*` 同一套设计语言与响应式断点）
-  - `.game-card`、`.crypto-entry` 圆角由 1.5rem 改为 22px，
-    补上与 gomoku 卡片一致的阴影、图标底座、`.tag-soon` 状态标签
+`img/chess/{w,b}{K,Q,R,B,N,P}.svg` 共 12 个 cburnett 棋子（**CC BY-SA 3.0**，非 MIT/GPL，
+对外分发需署名）。图片异步加载，未就绪时回退 Unicode 棋子，棋盘不会开天窗。
 
-未改动：`gomoku.js`、`gomoku-worker.js`、`gomoku-engine/`、
-`crypto-tools.js`、`fingerprint.js`、`lucky.js`。
+**C. 引擎接入（改动最大的一块，见上文「AI 引擎」全部 ⚠ 条目）**
 
-## 待办
+修掉的：hash 后缀、就绪判据、`movetime` 优先级、`HEAD` 探测误判、
+半装状态（只有 js 没有 wasm）、引擎非法着法导致对局卡死、空 bestmove 被误判为终局。
 
-- [ ] **浏览器实测**：起 HTTP 服务后走一遍完整对局，
-      重点确认 Stockfish 加载成功、悔棋/翻转/难度切换正常
-- [ ] 中国象棋（`#/xiangqi`）仍是占位页
-- [ ] `js/gomoku-engine/` 与 `js/chess-engine/` 缺 PGN 导入导出
-- [ ] 顶部导航目前只有「首页 / 加密工具」，可考虑补上各棋类入口
+**D. UI 改版（浅蓝 + 反 SaaS）**
+
+首页重做：非对称栅格（`1.25fr/.85fr`、`1.45fr/1fr`）、Instrument Serif 标题、
+蓝图网格纸纹背景、Iconify 替代全部 emoji、Picsum 图片、三条自定义回弹曲线
+（`--snap/--drift/--swing`）。删掉了顶部冗余的「加密工具」导航项。
+配色变量在 `:root`，旧变量名（`--card`/`--primary` 等）保留为别名，
+供尚未改造的棋类页使用 —— 属于过渡措施，后续可清理。
+
+**E. 顺手修的**
+
+- 五子棋难度按钮失效：`gomoku.js` 查 `.diff-btn`，HTML 里是 `.gomoku-diff-btn`，选择器匹配不到
+- 吃路兵专项测试 7/7 通过（含「两兵同离一横线暴露己方王」这个经典非法例）
+
+### 当前状态：可以玩
+
+引擎能跑、点击区域正确、翻转正常、棋子正常。走一步 e4 黑棋应 1 秒内应声。
+
+### 待办
+
+- [ ] **中国象棋（`#/xiangqi`）仍是占位页**，计划接 Pikafish 本地引擎
+- [ ] **PGN 导入导出**：`js/chess-engine/` 与 `js/gomoku-engine/` 都没有
+- [ ] **顶部导航补全**：目前只有「首页 / 国际象棋 / 五子棋」，缺加密工具与中国象棋入口
+- [ ] **清理过渡别名**：`css/style.css` 里旧变量名映射可逐步移除
+- [ ] **cburnett 棋子授权**：若对外分发，需在 README/LICENSE 补署名与 CC BY-SA 说明
+- [ ] **移除调试日志**：`chess-worker.js` 顶部 `const DBG = true`，确认稳定后可关掉
+
+### ⚠ 接手前必读：工作方法
+
+本次引擎接入连续返工 4 次（删 wasm、砍搜索深度、乱发 `isready`、加回坏 hash），
+**根因全是「没有浏览器却基于推断改代码」**。后来改成先在 worker 里埋日志、
+打印每一条收发命令和每一个静默丢弃分支，程序自己说话，一次定位。
+
+所以：**改动引擎链路前，先跑一遍上面「排查：引擎没反应怎么办」那段控制台脚本**，
+拿到实测输出再动手。不要凭猜测调参数 —— 这个引擎对时序极其敏感。
 
 ## 许可
 
@@ -236,6 +299,10 @@ setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8
 | --- | --- |
 | 本项目代码 | 见仓库 LICENSE |
 | chess.js | BSD-2-Clause（`js/chess-engine/chess.js.LICENSE`） |
-| Stockfish.js | GPLv3（`js/lib/README.md` 内有链接） |
+| Stockfish.js | **GPLv3**（`js/lib/README.md` 内有链接） |
+| cburnett 棋子 `img/chess/*.svg` | **CC BY-SA 3.0**（Cburnett，署名 + 相同方式共享） |
+| 开局库 `js/chess-book.js` | 数据源 lichess chess-openings，**CC0**（公共领域） |
 
 Stockfish 是 GPL 软件，若要分发本项目，需一并提供其源码。
+棋子图是 **CC BY-SA 3.0**（带 share-alike），与本项目代码的许可不同 —— 对外分发前
+请补上 Cburnett 署名，或改用许可更宽松的棋子集。

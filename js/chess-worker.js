@@ -8,20 +8,19 @@
  * Stockfish 的 Emscripten 构建通过 importScripts / self.onmessage 工作，
  * 而 module worker 里没有 importScripts。
  *
- * 引擎构建：Niklas Fiekas 的 stockfish.js（js/lib/stockfish.js 1.5 MB
- * + js/lib/stockfish.wasm 546 KB），与 Knight-Chess-Helper 用的完全一致。
+ * 引擎构建：nmrugg/stockfish.js **v19.0.0 lite-single**
+ * （js/lib/stockfish.js 21 KB + js/lib/stockfish.wasm 1.7 MB，NNUE 权重已内嵌）。
  *
- * 启动方式照抄参考项目 offscreen.js 的做法：
- *   new Worker(ENGINE_URL)          // 绝对 URL，不加任何 hash 后缀
+ * ⚠ 启动时**不要**加 '#stockfish.wasm,worker' 后缀（见 boot() 里的注释）。
+ * 引擎源码里有 `self.location.hash.split(',')[1] === 'worker'` 这段判断，
+ * 命中它会走进一条早期特殊分支，实测在浏览器里彻底卡死、零输出。
+ * 不带 hash 反而正常：引擎会用 `typeof importScripts === 'function'`
+ * 识别出 Worker 环境。
  *
- * 为什么不用 '#<wasm名>,worker' 后缀：那是**另一套上游**（nmrugg/stockfish.js）
- * 的约定 —— 它靠 self.location.hash 拼 locateFile。当前这个构建的
- * locateFile 是 `function(file){ return file }`，wasm 路径由
- * `scriptDirectory = self.location.href`（即引擎脚本自身 URL）推导，
- * 所以 stockfish.wasm 只要和 stockfish.js 放在同一目录就会被自动找到。
- * 加 hash 反而可能让 scriptDirectory 的 lastIndexOf('/') 算错位置。
+ * ⚠ 就绪判据是 `uciok` 而不是 `readyok`，且启动时有界重发 uci ——
+ * 两者都是实测踩出来的，详见 handleLine() 与 boot() 里的注释。
  *
- * 不需要任何 COOP/COEP 响应头：这是单线程构建，没用到 SharedArrayBuffer。
+ * 不需要任何 COOP/COEP 响应头：这是单线程 lite 构建，没用到 SharedArrayBuffer。
  */
 
 /**
@@ -158,8 +157,14 @@ function fail(reason) {
 function boot() {
   let inner;
   try {
-    // 照抄参考项目：绝对 URL，不加 hash 后缀。
-    // wasm 由引擎从脚本同目录自动加载（scriptDirectory = self.location.href）。
+    // ⚠ **不要**加 '#<wasm名>,worker' 后缀。
+    // 引擎里确实有这段判断：
+    //   self.location.hash.split(',')[1] === 'worker'
+    // 但命中它会走进一条**早期特殊分支**，实测那条路在浏览器里会彻底卡死
+    // （worker 脚本加载成功、无 onerror、但一个字节都不输出，uciok 永不回来）。
+    // 不带 hash 时该判断落空，引擎转而用
+    //   typeof importScripts === 'function'
+    // 正常识别 Worker 环境，反而一切正常。实测 A/B 验证过。
     dlog('创建引擎 worker:', ENGINE_URL);
     inner = new Worker(ENGINE_URL);
   } catch (e) {
@@ -170,17 +175,30 @@ function boot() {
 
   let booted = false;
 
-  // wasm 有 546 KB，首次实例化要时间。给足 30s 再判失败。
+  // wasm 有 1.7 MB（NNUE 权重已内嵌），首次实例化要时间。给足 30s。
   const timer = setTimeout(() => {
     if (booted) return;
+    clearInterval(retry);
     fail('引擎加载超时（30s，请确认 js/lib/stockfish.wasm 存在且服务器返回 application/wasm）');
   }, 30000);
+
+  // 这个构建的启动函数跑在 onmessage 赋值**之前**，极端时序下立刻发出的
+  // uci 会在接线完成前到达并被丢弃，于是永远等不到 uciok。
+  // 所以这里有界重发 uci，拿到 uciok 立刻停。
+  let uciTries = 0;
+  const retry = setInterval(() => {
+    if (booted) { clearInterval(retry); return; }
+    if (++uciTries > 8) { clearInterval(retry); fail('引擎未响应 uci'); return; }
+    dlog('重发 uci（第 ' + uciTries + ' 次）');
+    send('uci');
+  }, 900);
 
   inner.onmessage = (e) => {
     const line = String(e.data);
     if (!booted && line.includes('uciok')) {
       booted = true;
       clearTimeout(timer);
+      clearInterval(retry);
       dlog('握手完成（booted=true）');
     }
     handleLine(line);
@@ -188,6 +206,7 @@ function boot() {
   inner.onerror = (e) => {
     dlog('!! inner.onerror:', e.message, 'line', e.lineno);
     clearTimeout(timer);
+    clearInterval(retry);
     if (!booted) fail(e.message || '引擎脚本执行失败');
   };
 

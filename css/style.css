@@ -733,6 +733,48 @@ body {
   min-height: 1.1rem;
 }
 
+/* 评估分数：默认收起，点「查看评估 ▼」才展开。
+   为什么藏：深度是「算到第几层」，属于进度反馈，盯着无害；
+   分数是「谁更优」，一直摊在眼前容易让人照着分数下棋、反而不看局面了。
+   ⚠ .chess-score-box 必须 display:none —— 少了这一条，分数会一直显示，
+   而 JS 切的那个 .open 类没有任何规则接住，表现就是「折叠完全没反应」。 */
+.chess-score-toggle {
+  width: 100%; margin-top: 0.45rem; padding: 0.35rem 0; border: none;
+  background: transparent;
+  color: var(--text-muted); font-size: 0.74rem; font-weight: 600;
+  letter-spacing: 0.1em;
+  font-family: inherit; cursor: pointer; text-align: left;
+  transition: color .28s var(--drift);
+}
+.chess-score-toggle:hover { color: var(--primary); }
+.chess-score-box {
+  max-height: 0; margin-top: 0; overflow: hidden; opacity: 0;
+  transition: max-height .42s var(--snap), margin-top .42s var(--snap),
+              padding-top .42s var(--snap), opacity .3s var(--drift);
+}
+.chess-score-box.open {
+  max-height: 6rem; margin-top: 0.55rem; padding-top: 0.55rem;
+  border-top: 1px dashed var(--border);
+  opacity: 1;
+}
+.chess-score-label { font-size: 0.74rem; color: var(--text-muted); }
+.chess-score-value {
+  margin-left: 0.5rem;
+  font-family: var(--mono); font-size: 0.95rem; font-weight: 600;
+  color: var(--text);
+  transition: color .3s var(--drift);
+}
+/* 分数正负染色：白优偏蓝、白劣偏红，扫一眼就知道形势 */
+.chess-score-value.adv { color: var(--sky-deep); }
+.chess-score-value.dis { color: #b91c1c; }
+/* 展开动效：关掉动效偏好时直接落位，不留半截过渡 */
+@media (prefers-reduced-motion: reduce) {
+  .chess-score-box,
+  .chess-score-box.open,
+  .chess-score-toggle,
+  .chess-score-value { transition: none; }
+}
+
 /* 未安装引擎时的下载指引 */
 .chess-engine-help {
   margin-top: 0.8rem; padding: 0.85rem 0.9rem;
@@ -792,6 +834,60 @@ body {
   background: #fef3c7; border-color: #f59e0b; color: #b45309; font-weight: 600;
 }
 
+/* 自定义难度：模式切换 + 数字输入 */
+.chess-diff-custom {
+  margin-top: 0.6rem; padding-top: 0.6rem;
+  border-top: 1px dashed var(--border-strong);
+  display: flex; flex-direction: column; gap: 0.55rem;
+}
+.chess-diff-custom.hidden { display: none; }
+.chess-diff-modes { display: flex; gap: 8px; }
+.chess-diff-mode {
+  flex: 1; padding: 0.34rem 0; border-radius: 8px;
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text-muted); font-size: 0.74rem; font-weight: 500;
+  font-family: inherit; cursor: pointer; transition: all .3s var(--drift);
+}
+.chess-diff-mode:hover:not(:disabled) { color: var(--text); background: #eef2f6; }
+.chess-diff-mode.active {
+  background: var(--sky-pale); border-color: var(--sky); color: var(--sky-deep); font-weight: 600;
+}
+.chess-diff-row { display: flex; align-items: center; gap: 0.5rem; }
+.chess-diff-row.hidden { display: none; }
+.chess-diff-label {
+  flex: 1; font-size: 0.74rem; color: var(--text-muted);
+}
+/* 数字用等宽体：跳动时数字不会左右抖 */
+.chess-diff-input {
+  width: 4.6rem; padding: 0.34rem 0.5rem; border-radius: 8px;
+  border: 1px solid var(--border-strong); background: var(--white);
+  color: var(--text); font-family: var(--mono); font-size: 0.82rem;
+  text-align: center; transition: all .3s var(--drift);
+}
+.chess-diff-input:hover:not(:disabled) { border-color: var(--sky); }
+.chess-diff-input:focus {
+  outline: none; border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(47, 127, 191, .16);
+}
+/* 越界时给提示色：夹紧之前先让人知道自己填过头了 */
+.chess-diff-input.invalid {
+  border-color: #dc2626; color: #dc2626;
+}
+.chess-diff-input:disabled {
+  opacity: .55; cursor: not-allowed;
+  background: transparent; border-style: dashed;
+}
+.chess-diff-mode:disabled {
+  opacity: .5; cursor: not-allowed; border-style: dashed;
+}
+.chess-diff-mode:disabled.active {
+  opacity: .75; border-style: solid;
+}
+.chess-diff-unit {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--text-muted);
+  min-width: 2.4rem;
+}
+
 /* 按钮 */
 .chess-actions { display: flex; gap: 0.6rem; }
 .chess-actions-secondary { margin-top: 0.5rem; }
@@ -835,6 +931,271 @@ body {
   color: var(--text-muted); font-size: 0.74rem; font-weight: 600;
   letter-spacing: 0.1em; text-transform: uppercase;
   font-family: inherit; cursor: pointer; transition: color 0.15s;
+}
+
+/* ================= 中国象棋 =================
+/* ================= 中国象棋 =================
+   结构与 .chess-* 同一套（布局 / 徽标 / 难度 / 走子记录），
+   差异只在棋盘是木纹底、棋子更小一档，所以配色偏暖。 */
+.xq-layout {
+  display: flex; gap: 1.6rem; align-items: flex-start; justify-content: center;
+}
+.xq-board-frame {
+  flex: 1 1 auto; min-width: 0; max-width: 668px;
+  padding: 14px; border-radius: 26px;
+  background: var(--card); border: 1px solid var(--border);
+  box-shadow: 0 12px 30px -18px rgba(15, 23, 42, 0.25);
+}
+#xqCanvas {
+  display: block; width: 100%; height: auto;
+  border-radius: 16px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.xq-side-panel {
+  flex: 0 0 288px; display: flex; flex-direction: column; gap: 1.05rem;
+}
+.xq-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 22px; padding: 1.15rem 1.2rem;
+  box-shadow: 0 12px 30px -18px rgba(15, 23, 42, 0.25);
+}
+.xq-card-title {
+  font-size: 0.74rem; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem;
+}
+.xq-card-hint {
+  margin-top: 0.65rem; font-size: 0.72rem; color: var(--text-muted); line-height: 1.55;
+}
+.xq-card-hint code,
+.xq-engine-help-text code {
+  font-family: var(--mono);
+  background: #f1f5f9; padding: 0.05rem 0.3rem; border-radius: 5px;
+}
+
+/* 状态卡 */
+.xq-turn-indicator {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-size: 1.02rem; font-weight: 600; min-height: 26px;
+}
+/* 红点用暖色，和木纹棋盘呼应；黑点压深 */
+.xq-turn-dot {
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+  background: radial-gradient(circle at 35% 30%, #f7c6a0, #c0392b 70%);
+  box-shadow: 0 1px 3px rgba(120, 40, 20, 0.35);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.xq-turn-dot.black {
+  background: radial-gradient(circle at 35% 30%, #6b625a, #1d1a17 68%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+#xqStatusText.status-error { color: #dc2626; font-size: 0.86rem; }
+.xq-move-meta {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 0.65rem; padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted); font-size: 0.82rem;
+}
+.xq-move-meta b { color: var(--text); font-size: 0.92rem; }
+.xq-last-move {
+  font-family: var(--mono);
+  color: #b45309; font-weight: 600;
+}
+
+/* 难度 */
+.xq-difficulty { display: flex; gap: 8px; }
+.xq-diff-btn {
+  flex: 1; padding: 0.52rem 0; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text-muted); font-size: 0.82rem; font-weight: 500;
+  font-family: inherit; cursor: pointer; transition: all .3s var(--drift);
+}
+.xq-diff-btn:hover:not(:disabled) { color: var(--text); background: #eef2f6; }
+/* 开局后难度锁定：置灰但保留可读性，让人看得出「锁了」而不是「坏了」 */
+.xq-diff-btn:disabled {
+  opacity: .5; cursor: not-allowed;
+  background: transparent; border-style: dashed;
+}
+.xq-diff-btn:disabled:hover { color: var(--text-muted); background: transparent; }
+.xq-diff-btn:disabled.active { opacity: .75; border-style: solid; }
+.xq-diff-btn.active {
+  background: #fef3c7; border-color: var(--amber); color: #b45309; font-weight: 600;
+}
+
+/* 自定义难度：模式切换 + 数字输入 */
+.xq-diff-custom {
+  margin-top: 0.6rem; padding-top: 0.6rem;
+  border-top: 1px dashed var(--border-strong);
+  display: flex; flex-direction: column; gap: 0.55rem;
+}
+.xq-diff-custom.hidden { display: none; }
+.xq-diff-modes { display: flex; gap: 8px; }
+.xq-diff-mode {
+  flex: 1; padding: 0.34rem 0; border-radius: 8px;
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text-muted); font-size: 0.74rem; font-weight: 500;
+  font-family: inherit; cursor: pointer; transition: all .3s var(--drift);
+}
+.xq-diff-mode:hover:not(:disabled) { color: var(--text); background: #eef2f6; }
+.xq-diff-mode:disabled { opacity: .5; cursor: not-allowed; }
+.xq-diff-mode.active {
+  background: var(--sky-pale); border-color: var(--sky); color: var(--sky-deep); font-weight: 600;
+}
+.xq-diff-row { display: flex; align-items: center; gap: 0.5rem; }
+.xq-diff-row.hidden { display: none; }
+.xq-diff-label { flex: 1; font-size: 0.74rem; color: var(--text-muted); }
+.xq-diff-unit { font-size: 0.7rem; color: var(--text-muted); min-width: 2.2rem; }
+/* 数字用等宽体：跳动时数字不会左右抖 */
+.xq-diff-input {
+  width: 4.6rem; padding: 0.34rem 0.5rem; border-radius: 8px;
+  border: 1px solid var(--border-strong); background: var(--white);
+  color: var(--text); font-family: var(--mono); font-size: 0.82rem;
+  text-align: center; transition: all .3s var(--drift);
+}
+.xq-diff-input:hover:not(:disabled) { border-color: var(--sky); }
+.xq-diff-input:focus {
+  outline: none; border-color: var(--sky);
+  box-shadow: 0 0 0 3px rgba(47, 127, 191, .16);
+}
+.xq-diff-input:disabled { opacity: .5; cursor: not-allowed; }
+/* 越界时给提示色：夹紧之前先让人知道自己填过头了 */
+.xq-diff-input.invalid {
+  border-color: #dc2626; color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, .12);
+}
+
+/* 对局控制 */
+.xq-actions { display: flex; gap: 8px; }
+.xq-actions-secondary { margin-top: 8px; }
+.xq-btn {
+  flex: 1; padding: 0.58rem 0; border-radius: 12px; border: 1px solid transparent;
+  background: var(--primary); color: #fff; font-size: 0.86rem; font-weight: 600;
+  font-family: inherit; cursor: pointer; transition: all .3s var(--snap);
+}
+.xq-btn:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-2px); }
+.xq-btn-primary { background: var(--sky-deep); }
+.xq-btn-primary:hover:not(:disabled) { background: #164a78; }
+
+/* 战绩 */
+.xq-scoreboard {
+  display: flex; align-items: center; justify-content: center; gap: 0.7rem;
+  margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid var(--border);
+}
+.xq-score-item { display: flex; align-items: center; gap: 0.35rem; }
+.xq-score-item b {
+  font-family: var(--mono); font-size: 1.05rem; color: var(--text); font-weight: 700;
+}
+.xq-score-name { color: var(--text-muted); font-size: 0.8rem; }
+.xq-score-divider { color: var(--text-muted); opacity: 0.45; font-weight: 600; }
+
+/* 走子记录 */
+.xq-history-toggle {
+  width: 100%; padding: 0.45rem 0; border: none; background: transparent;
+  color: var(--text-muted); font-size: 0.74rem; font-weight: 600;
+  letter-spacing: 0.04em; font-family: inherit; cursor: pointer; transition: color 0.15s;
+}
+.xq-history-toggle:hover { color: var(--primary); }
+.xq-history-list {
+  display: none; margin-top: 0.6rem; padding-top: 0.6rem;
+  border-top: 1px dashed var(--border);
+  max-height: 210px; overflow-y: auto;
+}
+.xq-history-list.open { display: block; }
+.xq-history-row {
+  display: grid; grid-template-columns: 2rem 1fr 1fr;
+  gap: 0.35rem; padding: 0.2rem 0;
+  font-family: var(--mono); font-size: 0.78rem;
+}
+.xq-history-row .num { color: var(--text-muted); }
+.xq-history-row .w { color: #b3261e; font-weight: 600; }
+.xq-history-row .b { color: var(--text-muted); }
+.xq-history-empty {
+  font-size: 0.75rem; color: var(--text-muted); text-align: center; padding: 0.5rem 0;
+}
+
+/* 响应式：与国际象棋同一套断点 */
+@media (max-width: 900px) {
+  .xq-layout { flex-direction: column; align-items: center; }
+  .xq-side-panel {
+    width: 100%; max-width: 668px; flex-direction: row; flex-wrap: wrap;
+  }
+  .xq-side-panel .xq-card { flex: 1 1 200px; }
+}
+@media (max-width: 560px) {
+  .xq-side-panel { flex-direction: column; }
+  .xq-side-panel .xq-card { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xq-thinking i { animation: none; }
+}
+/* 引擎徽标 */
+.xq-engine-badge {
+  display: inline-block; font-size: 0.75rem; font-weight: 600;
+  padding: 0.3rem 0.75rem; border-radius: 100px;
+  border: 1px solid var(--border-strong); background: #f1f5f9; color: var(--text-muted);
+  transition: all .38s var(--snap);
+}
+.xq-engine-badge.ok { background: #dcfce7; border-color: #86efac; color: #15803d; }
+.xq-engine-badge.warn { background: #fef3c7; border-color: #fcd34d; color: #b45309; }
+.xq-engine-info {
+  margin-top: 0.55rem; font-size: 0.74rem; color: var(--text-muted);
+  font-family: var(--mono); min-height: 1.1rem;
+}
+/* 评估分数：默认收起，展开才看（同 .chess-engine-*） */
+.xq-engine-toggle {
+  width: 100%; margin-top: 0.4rem; padding: 0.35rem 0; border: none;
+  background: transparent; border-top: 1px dashed var(--border);
+  color: var(--text-muted); font-size: 0.72rem; font-weight: 600;
+  font-family: inherit; cursor: pointer; text-align: left;
+  transition: color .15s;
+}
+.xq-engine-toggle:hover { color: var(--primary); }
+.xq-engine-eval {
+  display: none;
+  margin-top: 0.35rem; padding: 0.45rem 0.6rem;
+  border: 1px dashed var(--border); border-radius: 8px;
+  background: #faf6f1;
+}
+.xq-engine-eval.open { display: block; }
+.xq-engine-eval-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 0.5rem; font-size: 0.74rem; color: var(--text-muted);
+}
+.xq-engine-eval-row b,
+.xq-engine-eval-value {
+  font-family: var(--mono); font-size: 0.92rem; color: var(--text);
+}
+/* 分数正负染色：红方优偏暖红、黑方优偏蓝，同国际象棋那边一眼看形势 */
+.xq-engine-eval-value.adv { color: #b45309; }
+.xq-engine-eval-value.dis { color: #1c5c92; }
+.xq-engine-help {
+  margin-top: 0.8rem; padding: 0.85rem 0.9rem;
+  border: 1px solid #fcd34d; border-radius: 14px;
+  background: #fffbeb; display: flex; flex-direction: column; gap: 0.55rem;
+}
+.xq-engine-help.hidden { display: none; }
+.xq-engine-help-title { font-size: 0.8rem; font-weight: 700; color: #b45309; }
+.xq-engine-help-text { font-size: 0.72rem; color: #92400e; line-height: 1.6; }
+.xq-engine-help-text code { background: #fef3c7; }
+.xq-engine-download { text-align: center; text-decoration: none; }
+.xq-btn-ghost {
+  background: transparent; border: 1px solid var(--border-strong); color: var(--text-muted);
+}
+.xq-btn-ghost:hover { background: #f1f5f9; color: var(--text); }
+.xq-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* 思考指示 */
+.xq-thinking { display: none; align-items: center; gap: 4px; margin-left: 0.15rem; }
+.xq-thinking.visible { display: inline-flex; }
+.xq-thinking i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--amber); animation: xqBlink 1.1s infinite ease-in-out;
+}
+.xq-thinking i:nth-child(2) { animation-delay: 0.18s; }
+.xq-thinking i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes xqBlink {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1); }
+}
 }
 .chess-history-toggle:hover { color: var(--primary); }
 .chess-history-list {
