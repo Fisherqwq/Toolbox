@@ -5,6 +5,12 @@
 js/lib/stockfish.js
 js/lib/stockfish.wasm
 
+# ---- godogpaw 中国象棋引擎：**要入库**（下面两行是显式反忽略，防止将来加通配规则时被误伤）----
+# 它不是从上游直接下载的，而是本地编译产物，上游 release 里没有现成 wasm；
+# 丢了就得重装 Go 工具链重新编译。原始文件另在 中国象棋模型/ 下留了一份。
+!js/lib/godogpaw/godogpaw.wasm
+!js/lib/godogpaw/wasm_exec.js
+
 # ---- 临时/备份目录 ----
 tmp_*
 *.bak

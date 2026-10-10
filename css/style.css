@@ -1140,33 +1140,7 @@ body {
   margin-top: 0.55rem; font-size: 0.74rem; color: var(--text-muted);
   font-family: var(--mono); min-height: 1.1rem;
 }
-/* 评估分数：默认收起，展开才看（同 .chess-engine-*） */
-.xq-engine-toggle {
-  width: 100%; margin-top: 0.4rem; padding: 0.35rem 0; border: none;
-  background: transparent; border-top: 1px dashed var(--border);
-  color: var(--text-muted); font-size: 0.72rem; font-weight: 600;
-  font-family: inherit; cursor: pointer; text-align: left;
-  transition: color .15s;
-}
-.xq-engine-toggle:hover { color: var(--primary); }
-.xq-engine-eval {
-  display: none;
-  margin-top: 0.35rem; padding: 0.45rem 0.6rem;
-  border: 1px dashed var(--border); border-radius: 8px;
-  background: #faf6f1;
-}
-.xq-engine-eval.open { display: block; }
-.xq-engine-eval-row {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 0.5rem; font-size: 0.74rem; color: var(--text-muted);
-}
-.xq-engine-eval-row b,
-.xq-engine-eval-value {
-  font-family: var(--mono); font-size: 0.92rem; color: var(--text);
-}
-/* 分数正负染色：红方优偏暖红、黑方优偏蓝，同国际象棋那边一眼看形势 */
-.xq-engine-eval-value.adv { color: #b45309; }
-.xq-engine-eval-value.dis { color: #1c5c92; }
+/* 引擎帮助面板：引擎随项目分发、不需要玩家下载，保留样式给「加载失败」用 */
 .xq-engine-help {
   margin-top: 0.8rem; padding: 0.85rem 0.9rem;
   border: 1px solid #fcd34d; border-radius: 14px;
@@ -1196,6 +1170,9 @@ body {
   0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
   40% { opacity: 1; transform: scale(1); }
 }
+/* 关掉动效偏好时不留半截过渡（与棋类页其它动效一致） */
+@media (prefers-reduced-motion: reduce) {
+  .xq-thinking i { animation: none; }
 }
 .chess-history-toggle:hover { color: var(--primary); }
 .chess-history-list {
@@ -1230,4 +1207,39 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .chess-thinking i { animation: none; }
+}
+
+/* ================= 离线：Service Worker 更新提示条 =================
+   新版本就绪时从顶部浮出；正在下棋的人可以先下完再点刷新。 */
+#swUpdateBar {
+  position: fixed; left: 50%; bottom: 1.1rem; transform: translateX(-50%);
+  z-index: 60;
+  display: flex; align-items: center; gap: 0.85rem;
+  max-width: min(92vw, 620px);
+  padding: 0.7rem 0.95rem;
+  border-radius: 2px;
+  background: var(--ink); color: var(--white);
+  border: 1px solid var(--sky-deep);
+  box-shadow: 0 14px 30px -16px rgba(15, 44, 69, .6);
+  font-size: 0.82rem;
+  animation: swBarIn .38s var(--snap);
+}
+#swUpdateBar span { flex: 1 1 auto; }
+#swUpdateBar button {
+  font-family: inherit; cursor: pointer; border-radius: 2px;
+  border: 1px solid transparent; padding: 0.3rem 0.7rem; font-size: 0.78rem;
+}
+#swUpdateBtn { background: var(--sky); color: var(--white); font-weight: 600; }
+#swUpdateBtn:hover { background: var(--sky-deep); }
+#swUpdateClose {
+  background: transparent; color: var(--sky-pale);
+  border-color: rgba(207, 228, 245, .35); padding: 0.3rem 0.5rem;
+}
+#swUpdateClose:hover { color: var(--white); }
+@keyframes swBarIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #swUpdateBar { animation: none; }
 }

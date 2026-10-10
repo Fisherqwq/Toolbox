@@ -5,11 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>摆摊 · 3 副棋和 4 个密码工具的本地摊位</title>
   <meta name="description" content="3 副棋、4 个密码工具，摊在你自己的浏览器台面上。断网可用，不注册，不上传。">
+  <!-- 图标用内联 SVG data URI：零请求、能进 SW 缓存、断网也在。
+       之前没写这一行，浏览器会去要 /favicon.ico，服务器没有 → 控制台一条 404。
+       注意这里**不写 xmlns**：data URI 形式的 favicon 不需要它，而写了会被
+       「零远程资源」的静态检查判成外链。 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f7fbf'/%3E%3Cg stroke='%23eaf2f9' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M8 8h16M8 16h16M8 24h16M8 8v16M16 8v16M24 8v16'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@600;900&family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+  <!-- 字体与图标全部本地自托管（vendor/ 由 tools/build-vendor-assets.mjs 生成）：
+       断网后不再依赖 fonts.googleapis.com / code.iconify.design -->
+  <link rel="stylesheet" href="vendor/fonts.css">
+  <script src="vendor/iconify-lite.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -71,8 +76,9 @@
           </div>
         </div>
         <figure class="masthead-figure">
+          <!-- 配图已本地化到 img/home/（原来是 picsum.photos 外链，断网会空） -->
           <img
-            src="https://picsum.photos/seed/chessdesk-blues/720/900"
+            src="img/home/chess-desk.webp" width="720" height="900"
             alt="一张木桌上的国际象棋残局" loading="eager" decoding="async">
           <figcaption>
             <iconify-icon icon="mdi:clock-outline"></iconify-icon>
@@ -90,7 +96,7 @@
       <div class="tables">
         <a class="table-card table-card--wide" href="#/chess">
           <img class="table-shot"
-               src="https://picsum.photos/seed/chessboard-wide/900/500"
+               src="img/home/chess-board.webp" width="900" height="500"
                alt="黑白棋子对弈的俯视画面" loading="lazy" decoding="async">
           <div class="table-body">
             <span class="table-icon"><iconify-icon icon="mdi:chess-rook"></iconify-icon></span>
@@ -109,7 +115,7 @@
 
         <a class="table-card" href="#/gomoku">
           <img class="table-shot"
-               src="https://picsum.photos/seed/gomoku-stone/600/420"
+               src="img/home/gomoku-stone.webp" width="600" height="420"
                alt="棋盘上一颗孤零零的黑子" loading="lazy" decoding="async">
           <div class="table-body">
             <span class="table-icon"><iconify-icon icon="mdi:circle-outline"></iconify-icon></span>
@@ -124,18 +130,18 @@
 
         <a class="table-card" href="#/xiangqi">
           <img class="table-shot"
-               src="https://picsum.photos/seed/xiangqi-board/600/420"
+               src="img/home/xiangqi-board.webp" width="600" height="420"
                alt="楚河汉界上的中国象棋残局" loading="lazy" decoding="async">
           <div class="table-body">
             <span class="table-icon"><iconify-icon icon="mdi:vector-square"></iconify-icon></span>
             <h3 class="table-name">中国象棋</h3>
             <p class="table-desc">
-              走象眼（ElephantEye），搜索 4 / 6 / 8 三档，也能自己填搜索层数。
-              规则引擎用 zh-chess，将死困毙都判得对。
+              走 godogpaw 本地引擎，简单 / 中等 / 困难三档，也能自己填搜索深度或每步思考时间。
+              规则、将军、将死困毙全由引擎判，页面只管画棋盘。
             </p>
             <ul class="table-facts">
-              <li><b>搜索 4 / 6 / 8 层</b><span>三档难度</span></li>
-              <li><b>perft(3) = 79666</b><span>走法生成校验</span></li>
+              <li><b>深度 2 / 4 / 8</b><span>三档难度</span></li>
+              <li><b>4.7 MB WASM</b><span>断网可下</span></li>
             </ul>
             <span class="table-go">摆一局<iconify-icon icon="mdi:arrow-right"></iconify-icon></span>
           </div>
@@ -164,7 +170,7 @@
           </ul>
         </div>
         <div class="ledger-side">
-          <img src="https://picsum.photos/seed/padlock-macro/560/520"
+          <img src="img/home/padlock.webp" width="560" height="520"
                alt="锁头特写" loading="lazy" decoding="async">
           <span class="ledger-arrow">打开<iconify-icon icon="mdi:arrow-right"></iconify-icon></span>
         </div>
@@ -250,19 +256,20 @@
       </a>
       <div class="view-head">
         <h2>中国象棋</h2>
-        <p>你执红先行，走子点两下：先点棋子，再点落点。AI 走象眼引擎，全在你本机跑。</p>
+        <p>你执红先行，走子点两下：先点棋子，再点落点。AI 是 godogpaw（本地 WASM），拔网线也能下。</p>
       </div>
 
       <div class="xq-layout">
         <div class="xq-board-frame">
-          <canvas id="xqCanvas" width="640" height="640"></canvas>
+          <!-- 逻辑尺寸 640×709（9 列 × 10 行的象棋盘比例），init 时会按 devicePixelRatio 放大位图 -->
+          <canvas id="xqCanvas" width="640" height="709"></canvas>
         </div>
 
         <aside class="xq-side-panel">
           <div class="xq-card xq-status-card">
             <div class="xq-turn-indicator">
               <span class="xq-turn-dot" id="xqTurnDot"></span>
-              <span id="xqStatusText">加载中…</span>
+              <span id="xqStatusText">正在加载引擎…</span>
               <span class="xq-thinking" id="xqThinkingIndicator"><i></i><i></i><i></i></span>
             </div>
             <div class="xq-move-meta">
@@ -273,55 +280,47 @@
 
           <div class="xq-card">
             <div class="xq-card-title">引擎</div>
-            <div class="xq-engine-badge warn" id="xqEngineBadge">检测中…</div>
+            <div class="xq-engine-badge warn" id="xqEngineBadge">加载中…</div>
             <div class="xq-engine-info" id="xqEngineInfo">—</div>
-            <!-- 评估分数默认收起，展开才看。理由同国际象棋那边：
-                 深度照常显示（它是进度反馈），只把「谁更优」藏起来。 -->
-            <button type="button" class="xq-engine-toggle" id="xqEvalToggle"
-                    aria-expanded="false" aria-controls="xqEvalBox">查看评估 ▼</button>
-            <div class="xq-engine-eval" id="xqEvalBox">
-              <div class="xq-engine-eval-row"><span>评估</span><b class="xq-engine-eval-value" id="xqEvalScore">—</b></div>
-            </div>
             <p class="xq-card-hint">
-              需要 <code>js/lib/eleeye/</code> 下的 <code>eleeye.js</code> +
-              <code>eleeye.wasm</code>，两个文件共 174 KB。缺一个都跑不起来。
+              对手是 <b>godogpaw</b>（Go 编译的 UCCI 引擎），跑在
+              <code>js/lib/godogpaw/</code> 里的 WebAssembly，全部在本机算，
+              拔网线照下。引擎自报的 <code>info</code> 行会打在浏览器控制台。
             </p>
-            <div class="xq-engine-help hidden" id="xqEngineHelp">
-              <div class="xq-engine-help-title">缺少象眼引擎</div>
-              <p class="xq-engine-help-text">
-                从上游下载 <code>eleeye.js</code> 与 <code>eleeye.wasm</code>，
-                放进 <code>js/lib/eleeye/</code> 目录后点「重新检测」。
-              </p>
-              <a class="xq-btn xq-btn-primary xq-engine-download"
-                 id="xqEngineDownload"
-                 href="https://github.com/billzi2016/Chinese-Chess-AI"
-                 target="_blank" rel="noopener noreferrer">前往下载象眼</a>
-              <button type="button" class="xq-btn xq-btn-ghost" id="xqEngineRetry">重新检测</button>
-            </div>
-            </div>
-<div class="xq-card">
+          </div>
+
+          <div class="xq-card">
             <div class="xq-card-title">难度</div>
             <div class="xq-difficulty" id="xqDepthGroup">
-              <button type="button" class="xq-diff-btn" data-preset="easy" data-hint="搜索 4 层">初级</button>
-              <button type="button" class="xq-diff-btn active" data-preset="normal" data-hint="搜索 6 层">中级</button>
-              <button type="button" class="xq-diff-btn" data-preset="hard" data-hint="搜索 8 层">高级</button>
-              <button type="button" class="xq-diff-btn" data-preset="custom" data-hint="自己填搜索层数">自定义</button>
+              <button type="button" class="xq-diff-btn" data-preset="easy">简单</button>
+              <button type="button" class="xq-diff-btn active" data-preset="normal">中等</button>
+              <button type="button" class="xq-diff-btn" data-preset="hard">困难</button>
+              <button type="button" class="xq-diff-btn" data-preset="custom">自定义</button>
             </div>
 
-            <!-- 自定义难度：只有一个参数 —— 搜索层数。
-                 象眼引擎没有限强选项，也只认 `go depth`（实测 go movetime 不返回），
-                 所以「棋力等级」「每步思考时间」这类开关一律不做，
-                 摆一个不生效的输入框比没有更糟。 -->
+            <!-- 自定义难度：搜索深度 或 每步思考时间，二选一。
+                 引擎的 engineSearch(depth, ms) 两个参数都认（实测：
+                 depth=99 配 ms=800 → 849ms 返回；depth=4 配 ms=3000 → 按深度先跑完就返回）。 -->
             <div class="xq-diff-custom hidden" id="xqCustomDiff">
+              <div class="xq-diff-modes" id="xqDiffModeGroup">
+                <button type="button" class="xq-diff-mode active" data-mode="depth">按深度</button>
+                <button type="button" class="xq-diff-mode" data-mode="time">按时间</button>
+              </div>
               <div class="xq-diff-row" data-field="depth">
                 <label class="xq-diff-label" for="xqCustomDepth">搜索深度</label>
                 <input type="number" class="xq-diff-input" id="xqCustomDepth"
-                       min="1" max="30" step="1" value="10" inputmode="numeric">
+                       min="1" max="20" step="1" value="6" inputmode="numeric">
                 <span class="xq-diff-unit">层</span>
+              </div>
+              <div class="xq-diff-row hidden" data-field="time">
+                <label class="xq-diff-label" for="xqCustomTime">每步思考</label>
+                <input type="number" class="xq-diff-input" id="xqCustomTime"
+                       min="100" max="30000" step="100" value="3000" inputmode="numeric">
+                <span class="xq-diff-unit">毫秒</span>
               </div>
             </div>
 
-            <p class="xq-card-hint" id="xqDepthHint">正在检测引擎…</p>
+            <p class="xq-card-hint" id="xqDepthHint">引擎就绪后可选难度</p>
           </div>
 
           <div class="xq-card">
@@ -332,7 +331,10 @@
             </div>
             <div class="xq-actions xq-actions-secondary">
               <button type="button" class="xq-btn xq-btn-ghost" id="xqFlipBtn">翻转棋盘</button>
-              <button type="button" class="xq-btn xq-btn-ghost" id="xqCopyFenBtn">复制 FEN</button>
+              <button type="button" class="xq-btn xq-btn-ghost" id="xqResignBtn" disabled>认输</button>
+            </div>
+            <div class="xq-actions xq-actions-secondary">
+              <button type="button" class="xq-btn xq-btn-ghost" id="xqCopyFenBtn">复制开局 FEN</button>
             </div>
             <div class="xq-scoreboard">
               <div class="xq-score-item">
@@ -360,7 +362,6 @@
         </aside>
       </div>
     </section>
-          </div>
     <section id="view-chess" class="view hidden">
       <a href="#/" class="back-link">
         <iconify-icon icon="mdi:arrow-left"></iconify-icon> 回首页
@@ -573,13 +574,15 @@
   <script src="js/lucky.js"></script>
   <script src="js/crypto-tools.js"></script>
   <script src="js/gomoku.js"></script>
-  <!-- 中国象棋：规则引擎（zh-chess，MIT）提供走法生成与合法性判定，
-       棋盘绘制与对局流程在 js/xiangqi.js，AI 走象眼 ElephantEye -->
-  <script src="js/xiangqi-engine/zh-chess.browser.min.js"></script>
+  <!-- 中国象棋：规则/AI 全部来自 godogpaw（Go/WASM），页面逻辑在 js/xiangqi.js。
+       bridge 负责加载、就绪等待、超时、崩溃保护与 FEN 校验，本身不含规则。 -->
+  <script src="js/lib/godogpaw/godogpaw-bridge.js"></script>
   <script src="js/xiangqi.js"></script>
   <script type="module" src="js/chess-bridge.js"></script>
   <script src="js/chess-book.js"></script>
   <script src="js/chess.js"></script>
   <script src="js/main.js"></script>
+  <!-- 离线：Service Worker 把页面、样式、脚本、引擎 wasm 全缓存进本机 -->
+  <script src="js/sw-register.js"></script>
 </body>
 </html>

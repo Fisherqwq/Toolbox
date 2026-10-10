@@ -9,16 +9,18 @@
 
 ## 一、项目现状速览
 
-**是什么**：纯静态、本地运行的网页工具箱（国际象棋 + 五子棋 + 加密工具）。
+**是什么**：纯静态、本地运行的网页工具箱（国际象棋 + 五子棋 + 中国象棋 + 加密工具）。
 无后端、无账号、无上传，所有计算在浏览器内完成。
 
-**路由**：`#/` 首页 · `#/chess` 国际象棋 · `#/gomoku` 五子棋 · `#/crypto` 加密 · `#/xiangqi` 占位页
+**路由**：`#/` 首页 · `#/chess` 国际象棋 · `#/gomoku` 五子棋 · `#/crypto` 加密 · `#/xiangqi` 中国象棋
 
-**规模**：44 个文件 / 2.31 MB（含 Stockfish 模型）
+**测试**：
+- `node js/chess-engine/test.mjs` → 49 项（含 4 组 perft 标准局面）
+- `node tools/test-xiangqi.mjs` → 49 项（中国象棋引擎与桥接层）
+- `node tools/check-xiangqi-page.mjs` → 34 项（中国象棋静态检查）
+- `node tools/test-xiangqi-browser.mjs` → 27 项（浏览器端到端，需 Chrome/Edge）
 
-**测试**：`node js/chess-engine/test.mjs` → 49 项断言，含 4 组 perft 标准局面
-
-**状态**：可玩。引擎能跑、点击区域正确、翻转正常、棋子正常。
+**状态**：四个页面都可用。中国象棋已换成 godogpaw 本地引擎，可离线。
 
 ---
 
@@ -62,7 +64,52 @@ setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8
 > ⚠ 项目原 README 曾写「hash 后缀是必需的」——**这条是错的**，已被 A/B 实测推翻。
 ---
 
-## 三、本次修复的 bug 清单
+## 二之二、中国象棋（godogpaw）—— 第二轮接手必读
+
+**引擎**：`中国象棋模型/main.wasm` 是 **Go 1.27.1 编译的 godogpaw**（不是象眼，也不是 Pikafish）。
+已复制到 `js/lib/godogpaw/`，原目录原样保留。
+
+**6 个全局函数**（实测，不是从文档推断）：
+
+| 函数 | 语义 |
+| --- | --- |
+| `engineNewGame(fen)` | `''` = 标准开局；畸形 FEN 会崩坏引擎（见下） |
+| `engineGetBoard()` | JSON：`{ board[90], sideToMove, inCheck, isGameOver, lastMoveFrom, lastMoveTo }` |
+| `engineGetLegalMovesFrom(sq)` | 目标格数组；⚠ **只生成轮到走子那一方的着法**，问对方棋子返回 `[]`（设计，不是 bug） |
+| `engineDoMoveBySquares(from,to)` | 合法 `true` 且落子；非法 `false` 且盘面不变 |
+| `engineUndoMove()` | 撤一手；空历史 `false` |
+| `engineSearch(depth,ms)` | 返回 **Promise<"b2e2">**，⚠ **自己就把棋走掉了**，别补 doMove |
+
+**坐标系**（三轮校准，写错过两次）：`sq = file + rank*9`，**rank 0 = 红方底线**（画在画布下方）。
+红 `1..7`（俥仕炮兵傌相帅）/ 黑 `9..15`（车士砲卒马象将）。锚点：红帅 sq4、黑将 sq85、红兵 a3=sq27（走 a4=sq36）。
+
+**耗时**（Node 开局）：d2=8ms · d4=64ms · d6=451ms · d8=1548ms；`engineSearch(30,800)` → 806ms，**限时真的生效**。
+
+**两个引擎缺陷**（前端只隔离，不修，等作者）：
+
+1. 畸形 FEN → 要么 Go panic 打死 runtime，要么静默接受并污染盘面（非法走子方 `'x'` 被解析成 1）。
+   所以桥接层有 FEN 校验 + 白名单，界面不提供自定义局面。
+2. AI 可能走出"自己送将"的着法（自我对弈实测：`e7e3` 把黑将送给红炮打）。
+
+**这一轮踩的四个坑**（都已修，别再犯）：
+
+| # | 症状 | 根因 |
+| --- | --- | --- |
+| 1 | 页面刚打开那几百毫秒内点击全部落空 | Service Worker **首次安装**就 `location.reload()`；首装接管不影响正确性，不该刷新 |
+| 2 | 玩家落子成功但 AI 永远不应手，控制台一片安静 | `let searchGen` 声明在 `playMove` 之后，`aiMove()` 第一句 `++searchGen` 撞暂时性死区抛 `ReferenceError`，被事件系统吞掉 |
+| 3 | 悔棋"只撤一手、记录剩半回合" | 靠"数手数"判断撤几手，而 AI 那手是否已记入取决于读到哪一帧；改成"撤到上次玩家落子前的盘面为止"（可自我纠正） |
+| 4 | 棋子全画成红色 | 颜色判断写成 `code >= 1`，黑方 9..15 也被判成红；应 `code <= 7` 才是红 |
+
+另外：`css/style.css` 里 `@keyframes xqBlink` 之后原本多一个 `}`（**改动前就存在**），
+会让后面的规则跑到媒体查询外面，已修。
+
+**离线**：`sw.js` 预缓存 73 个请求（含 4.7 MB wasm）；HTML 走 network-first，其余 cache-first；
+字体与图标已自托管到 `vendor/`（`node tools/build-vendor-assets.mjs` 重新生成）。
+改脚本/样式后记得升 `sw.js` 的 `CACHE_VERSION`。
+
+---
+
+## 三、国际象棋那一轮修复的 bug 清单
 
 ### 3.1 棋盘交互（5 个，全是真 bug）
 
@@ -162,10 +209,50 @@ setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8
 
 ### 4.4 图标与图片
 
-- **Iconify**：`<iconify-icon icon="mdi:xxx">`。
-  图标名要先对 `https://api.iconify.design/<集合>/<名称>.svg` 验证存在再用
-- **Picsum** 配固定 seed（`picsum.photos/seed/xxx/W/H`），带 `loading="lazy"`
+- **图标**：`<iconify-icon icon="mdi:xxx">`。图标名要先对
+  `https://api.iconify.design/<集合>/<名称>.svg` 验证存在再用
+- **图片**：原设计用 Picsum 固定 seed（`picsum.photos/seed/xxx/W/H`）。
+  **2026-10-11 已全部本地化**到 `img/home/`（WebP，共 130 KB），
+  重新生成用 `node tools/localize-images.mjs`。
+  ⚠ Picsum 要 WebP 必须用**路径后缀** `.../600/420.webp`，`?fm=webp` 会被忽略
 - 两者都要有降级方案（图片失败回退到字符/占位，别让版面开天窗）
+
+### 4.5 离线（Service Worker）
+
+`sw.js` + `js/sw-register.js`：预缓存 48 个清单项（字体按 `fonts.css` 动态补全），
+HTML 文档走 **network-first**（保证能更新），其余 cache-first；
+改样式或脚本后必须升 `CACHE_VERSION`（当前 **v3**）。
+**首次安装不要 `location.reload()`** —— 首装接管不影响正确性，重载会让刚打开的页面丢失点击。
+
+### 4.6 favicon 与「404 漏检」的教训
+
+`index.html` 原先没写 `<link rel="icon">`，浏览器会去要 `/favicon.ico` → 控制台一条 404。
+现在用**内联 SVG data URI**（零请求，断网也在）。
+
+⚠ data URI 里**不要写 `xmlns="http://www.w3.org/2000/svg"`** —— favicon 不需要，
+而写了会被"零远程资源"的静态检查判成外链。
+
+⚠ **这个 404 藏了很久，因为冒烟脚本把它当噪声过滤了**。教训：过滤器只该放过
+"已确认无害"的项，且必须记录条数；现在改成 **404 一律算问题并把 URL 打出来**。
+
+### 4.7 国际象棋引擎「探测到却没就绪」
+
+**症状**：`[chess] 引擎文件：js=true wasm=true`、`[sf] < uciok`、`[sf] 握手完成`，
+但主线程始终收不到 `ready`，侧栏永远停在「正在加载 Stockfish…」。
+
+**根因**：worker 收到 `uciok` 后那段（`flush()` → `postMessage(ready)`）**完全没有兜底**，
+抛错就静默半死；主线程也没有超时，只会一直转圈。
+
+**修法**（两层探活 + 两侧兜底）：
+
+| 侧 | 改动 |
+| --- | --- |
+| worker | `handleLine` 调用包 try/catch（打 `[sf] !! handleLine 抛错`）；`postMessage(ready)` 包 try/catch 并置 `readyPosted`；新增 `ping` 分支（已 ready 就重发，未 ready 就发 `isready`）；`readyok` 到达且尚未 ready 时补发 |
+| 主线程 | `armReadyWatchdog()`：1.8s 未 ready 发 `ping`；再 2.5s 徽标改「Stockfish 已找到但未就绪」+ 可操作提示；`ready`/`unavailable`/重新 spawn 时 `disarm` |
+
+**通用教训**：worker 与主线程是两个事件循环，"发过消息"≠"收到消息"。
+任何跨线程握手都必须有**超时 + 探活 + 明确文案**，否则单侧静默就会表现成
+"功能明明在却说没有"这种最难查的状态。
 
 ---
 
@@ -218,19 +305,28 @@ setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8
 |---|---|---|---|
 | 国际象棋规则引擎 | `js/chess-engine/` | BSD-2-Clause | 含 49 项断言的回归测试 |
 | 五子棋引擎 | `js/gomoku-engine/` | 项目自有 | 纯 JS 模块，带置换表 |
+| 中国象棋引擎 | `js/lib/godogpaw/` | 上游 MIT | Go/WASM，6 个全局函数；桥接层含加载/超时/崩溃保护 |
+| 中国象棋回归测试 | `tools/test-xiangqi.mjs` | 无 | **49 项**，浏览器环境替身 + 引擎实测，可直接套用到别的 WASM 引擎 |
+| 浏览器端到端测试 | `tools/test-xiangqi-browser.mjs` | 无 | **27 项**，puppeteer-core + 系统 Chrome；含点击命中、AI 应手、SW 校验 |
+| 静态检查脚本 | `tools/check-xiangqi-page.mjs` | 无 | **34 项**，查 id/标签配平/远程资源/SW 清单完整性 |
+| 自托管字体与图标 | `vendor/` | 见文件内注释 | `tools/build-vendor-assets.mjs` 一键重新生成；中文用 fonttools 子集化 |
+| 离线方案 | `sw.js` + `js/sw-register.js` | 无 | 预缓存 + HTML network-first + 版本化缓存 + 更新提示条，可直接搬到别的静态站 |
 | 棋子 SVG x12 | `img/chess/` | **CC BY-SA 3.0** | cburnett，chess.com 同款，注意 share-alike |
 | 开局库 | `js/chess-book.js` | CC0 数据 | `node tools/build-chess-book.mjs` 可重新生成 |
 | 设计令牌 | `css/style.css` 的 `:root` | 无 | 直接复制第四节变量 |
 | UCI worker 模式 | `js/chess-worker.js` | 无 | 队列 + flush + uciok 就绪 + 断点日志，可套用任何 UCI 引擎 |
 | 徽标状态机 | `js/chess.js` | 无 | 加载态与错误态分离的写法 |
+| 页面埋点模式 | `js/xiangqi.js` 的 `dbg()` | 无 | `window.XiangqiDebug = true` 开日志、`window.__xqLog` 给自动化读取 |
 
 ---
 
 ## 八、下一项目开工前的检查清单
 
-- [ ] 本地能跑：`python3 -m http.server 8000`
-      （**不要用 `file://`**，Worker / WASM / fetch 全部失效）
-- [ ] 语法与测试：`node --check <每个 js>`、`node js/chess-engine/test.mjs`
+- [ ] 本地能跑：`python tools/serve.py 8000` 或 `python -m http.server 8000`
+      （**不要用 `file://`**，Worker / WASM / Service Worker / fetch 全部失效）
+- [ ] 语法与测试：`node --check <每个 js>`、`node js/chess-engine/test.mjs`、
+      `node tools/test-xiangqi.mjs`
 - [ ] **确认有浏览器可验证**，否则先按第五节埋日志，别靠猜
 - [ ] `.gitignore` 已排除 `js/lib/stockfish.*`，**换机器时要单独拷模型文件**
+- [ ] 改了样式或脚本后，**升 `sw.js` 的 `CACHE_VERSION`**，否则用户可能拿到旧文件
 - [ ] 对外分发前补 cburnett 署名（CC BY-SA）与 Stockfish 源码（GPLv3）

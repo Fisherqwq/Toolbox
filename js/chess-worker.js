@@ -45,6 +45,15 @@ let seenInfo = false;
 let currentSide = 'w';         // 当前局面的行棋方，用于把 UCI 分数换成白方视角
 
 /**
+ * ready 信号的去重与兜底。
+ * 为什么需要：ready 只发一次，如果它在极端时序下没被主线程收到，
+ * 主线程会永远停在「正在加载 Stockfish…」（实测踩过）。
+ * 现在主线程会补发 isready 探活，引擎回 readyok 时这里可以再补一次。
+ */
+let readyPosted = false;       // 已经发出过 ready
+let readyAcked = false;        // 已经收到过 uciok（可以接受 isready 探活）
+
+/**
  * UCI 的 score/mate 是「行棋方视角」，主线程统一按白方视角显示。
  * 这里做一次归一化。
  */
@@ -120,12 +129,27 @@ function handleLine(raw) {
     // 而且这两条本来就没必要：引擎默认值已经是 Threads=1、Hash=16，
     // 发出去等于「用一个会触发重建的路径去设置成它已有的值」。
     flush();
-    self.postMessage({ type: 'ready' });
+    // ⚠ 这里整段都必须容错：一旦抛错，「engineReady 永远为 false」，
+    //   主线程只会一直显示「正在加载 Stockfish…」，而且看不到任何报错。
+    //   实测症状：worker 日志里 `< uciok`、`握手完成` 都在，主线程却像没收到一样。
+    try {
+      self.postMessage({ type: 'ready' });
+      readyPosted = true;
+    } catch (e) {
+      dlog('!! postMessage(ready) 失败:', e && e.message);
+    }
+    // 兜底：主线程若仍没收到 ready（消息在极端时序下丢失），
+    // 会在 1.5s 后发 isready；引擎回 readyok 时再补发一次。
+    readyAcked = true;
     return;
   }
   if (line === 'readyok') {
-    // 只为兼容而存在：即使引擎主动回了 readyok，也不再触发 flush
-    //（flush 已在 uciok 时做过了），避免重复下发命令。
+    // 只为兼容而存在：flush 已在 uciok 时做过了，这里不再触发。
+    // 但若主线程是用 isready 在兜底探活，就借这个 readyok 把 ready 补上。
+    if (readyAcked && !readyPosted) {
+      readyPosted = true;
+      try { self.postMessage({ type: 'ready' }); } catch (e) { dlog('!! 补发 ready 失败:', e && e.message); }
+    }
     return;
   }
   if (line.startsWith('info ')) {
@@ -201,7 +225,13 @@ function boot() {
       clearInterval(retry);
       dlog('握手完成（booted=true）');
     }
-    handleLine(line);
+    // ⚠ 必须包起来：handleLine 抛错会让 worker 静默半死 ——
+    //   ready 发不出去，主线程就一直显示「正在加载」，且没有报错可查。
+    try {
+      handleLine(line);
+    } catch (err) {
+      dlog('!! handleLine 抛错:', line.slice(0, 60), err && err.message);
+    }
   };
   inner.onerror = (e) => {
     dlog('!! inner.onerror:', e.message, 'line', e.lineno);
@@ -228,6 +258,21 @@ self.onmessage = function (e) {
   switch (type) {
     case 'boot':
       boot();
+      break;
+
+    /**
+     * 探活：主线程在「worker 侧已过 uciok，但 1.5s 内没收到 ready」时发这条。
+     * 两种回法，主线程都认：
+     *   · 已经 ready 过 → 直接重发 ready（幂等，主线程按状态收敛）
+     *   · 还没 ready    → 发一条 isready，引擎回 readyok 时补发 ready
+     */
+    case 'ping':
+      dlog('  ping: uciReady=' + uciReady + ' readyPosted=' + readyPosted);
+      if (readyPosted) {
+        try { self.postMessage({ type: 'ready' }); } catch (err) { dlog('!! 重发 ready 失败:', err && err.message); }
+      } else if (uciReady) {
+        send('isready');
+      }
       break;
 
     case 'init':

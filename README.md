@@ -21,7 +21,7 @@ python3 -m http.server 8000
 | --- | --- | --- |
 | 国际象棋 | `#/chess` | ✅ 可对弈 |
 | 五子棋 | `#/gomoku` | ✅ 可对弈 |
-| 中国象棋 | `#/xiangqi` | 🚧 占位页（开发中） |
+| 中国象棋 | `#/xiangqi` | ✅ 可对弈（godogpaw 本地引擎，可离线） |
 | 加密工具箱 | `#/crypto` | ✅ AES-GCM / Base64 / SHA-256 / SHA-512 |
 
 ## 目录结构
@@ -30,8 +30,11 @@ python3 -m http.server 8000
 Toolbox-main/
 ├── index.html              页面骨架：所有视图的 HTML
 ├── css/style.css           全站样式（CSS 变量 + 各工具的独立前缀）
+├── sw.js                   Service Worker：预缓存整站（含引擎 wasm），断网可用
+├── vendor/                 自托管字体与图标（不再依赖 Google Fonts / Iconify CDN）
 └── js/
     ├── main.js             hash 路由 + 加密工具的事件绑定
+    ├── sw-register.js      Service Worker 注册 + 新版本提示条
     ├── fingerprint.js      设备指纹
     ├── lucky.js            今日幸运值
     ├── crypto-tools.js     AES / Base64 / SHA
@@ -44,9 +47,16 @@ Toolbox-main/
     ├── chess-worker.js     Stockfish 后端（经典 Worker，走 UCI）
     ├── chess-book.js       开局库（自动生成，见 tools/build-chess-book.mjs）
     ├── chess-engine/       国际象棋规则（chess.js）与兼底引擎
+    │
+    ├── xiangqi.js          中国象棋界面与对局（规则全在引擎里）
+    ├── lib/godogpaw/       中国象棋引擎 godogpaw（Go/WASM）+ 桥接层
     └── lib/                Stockfish 可执行文件（不入库，见 js/lib/README.md）
 tools/
-    └── build-chess-book.mjs  重新生成开局库（Node 脚本）
+    ├── build-chess-book.mjs      重新生成开局库（Node 脚本）
+    ├── build-vendor-assets.mjs   重新生成 vendor/ 的字体与图标
+    ├── check-xiangqi-page.mjs    中国象棋静态检查（34 项）
+    ├── test-xiangqi.mjs          中国象棋引擎与桥接层回归（49 项）
+    └── test-xiangqi-browser.mjs  中国象棋浏览器端到端（27 项，需 Chrome/Edge）
 ```
 
 样式命名按工具分前缀：`.gomoku-*`、`.chess-*`、`.crypto-*`、`.game-*`。
@@ -233,6 +243,82 @@ setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8
 `chess-worker.js` 顶部有 `const DBG = true`，会在控制台打印 `[sf]` 前缀的
 收发日志（发出什么、收到什么、哪一步被丢弃），排查时非常好用。
 
+#### 「探测到了引擎，界面却说没找到」
+
+这是 **worker 侧已 `uciok`、主线程却没收到 `ready`** 的典型症状（worker 日志里有
+`< uciok`、`握手完成（booted=true）`，但没有任何 `ready` 相关行）。现在有三层保护：
+
+| 现象 | 含义 |
+| --- | --- |
+| 控制台 `[chess] 引擎 1.8s 未就绪，发 isready 探活` 之后徽标变绿 | `ready` 确实丢过一次，兜底生效，可以正常下棋 |
+| 控制台 `[chess] 引擎经 isready 探活后就绪` | 同上，且已确认是探活救回来的 |
+| 徽标显示「Stockfish 已找到但未就绪」 | 兜底也没救回来，请把控制台 `[sf]` + `[chess]` 全部日志发出来 |
+
+worker 侧也加了兜底：`handleLine` 抛错会打印 `[sf] !! handleLine 抛错:`（以前是静默半死），
+`postMessage({type:'ready'})` 失败会打印 `[sf] !! postMessage(ready) 失败:`。
+
+## 中国象棋
+
+完整说明见 **[中国象棋-README.md](中国象棋-README.md)**，引擎接口与已知缺陷见
+[js/lib/godogpaw/README.md](js/lib/godogpaw/README.md)。这里只放要点。
+
+### 引擎
+
+| 文件 | 大小 | 说明 |
+| --- | --- | --- |
+| `js/lib/godogpaw/godogpaw.wasm` | 4.7 MB | **godogpaw** 本体，Go 1.27.1 编译的 WebAssembly |
+| `js/lib/godogpaw/wasm_exec.js` | 17 KB | Go 官方胶水，**必须与 wasm 同版本** |
+| `js/lib/godogpaw/godogpaw-bridge.js` | 12 KB | 桥接层：加载 / 就绪 / 超时 / 崩溃保护 / FEN 校验 |
+
+引擎往 `window` 挂 6 个函数（都是**实测**确认的，`tools/test-xiangqi.mjs` 逐条跑）：
+`engineNewGame(fen)`、`engineGetBoard()`、`engineGetLegalMovesFrom(sq)`、
+`engineDoMoveBySquares(from,to)`、`engineUndoMove()`、`engineSearch(depth,ms)`。
+
+**三条最容易踩的**：
+
+- ⚠ **坐标系**：`sq = file + rank*9`，**rank 0 = 红方底线**（画布下方），红 `1..7` / 黑 `9..15`。
+- ⚠ **`engineSearch` 自己就把棋走掉了**，返回 `"b2e2"` 这类着法串；调用方不要再补一次 `doMove`。
+- ⚠ **`engineGetLegalMovesFrom` 只生成"轮到走子那一方"的着法**：问对方棋子一律返回 `[]`。这是设计。
+
+规则（走法生成、合法性、将军、将死/困毙）**全部来自引擎**，`js/xiangqi.js` 里没有一行象棋规则。
+页面只负责画棋盘、交互、难度、记谱、离线。
+
+### 难度
+
+简单 `depth 2` / 中等 `depth 4` / 困难 `depth 8`（1200 ms 上限）/ 自定义（深度 1–20 或每步 100–30000 ms，二选一）。
+实测耗时（Node 开局）：`d2 = 8ms`、`d4 = 64ms`、`d6 = 451ms`、`d8 = 1548ms`。
+**走出第一步后难度锁定**，只有「新对局」解锁（理由同国际象棋那边）。
+
+### 测试
+
+```bash
+node tools/check-xiangqi-page.mjs      # 静态检查 34 项
+node tools/test-xiangqi.mjs            # 引擎与桥接层回归 49 项
+node tools/test-xiangqi-browser.mjs    # 浏览器端到端 27 项（需 Chrome/Edge）
+```
+
+### ⚠ 引擎自身的两个缺陷（前端只隔离，不修）
+
+1. **畸形 FEN 会崩坏引擎**：实测要么 Go 侧 panic、runtime 退出，要么静默接受并污染盘面。
+   所以桥接层做 FEN 结构校验 + 白名单，界面**不提供**自定义局面 / 粘贴 FEN / 复制局面。
+2. **AI 可能走出"自己送将"的着法**：自我对弈实测出现过。按约定前端**不做规则补丁**，
+   只记录复现步骤，等引擎作者修。
+
+## 离线（Service Worker）
+
+`sw.js` 把整站预缓存（**48 个清单项 + 动态补全 29 个字体文件，含 4.7 MB 引擎 wasm**），
+首屏加载完成后断网仍可玩：
+
+- 预缓存清单（HTML / CSS / JS / wasm / 字体 / 图标 / 配图）→ install 时装好，fetch 走 **cache-first**
+- **HTML 文档走 network-first**，断网才回退缓存 —— 这样刷新一定能拿到新版，不会"更新不动"
+- 改样式或脚本后记得把 `sw.js` 里的 `CACHE_VERSION` 加一，`activate` 阶段会清掉所有旧缓存
+- 页面顶部有更新提示条，新版本就绪时浮出，用户确认后才 `skipWaiting` 切换（不打断对局）
+
+**字体、图标、配图全部自托管**：字体与图标在 `vendor/`（`node tools/build-vendor-assets.mjs`
+重新生成），首页 5 张配图在 `img/home/`（WebP 共 130 KB，`node tools/localize-images.mjs` 重新生成）。
+结果是 **`index.html` 里没有任何自动加载的远程资源**，只剩 2 条用户点击才走的跳转外链
+（国际象棋的 Stockfish 下载指引等），断网不影响任何页面渲染。
+
 ## 交接说明（给接手的人 / AI）
 
 ### 本次会话做了什么
@@ -295,14 +381,32 @@ setTimeout(() => { w.postMessage('position startpos'); w.postMessage('go depth 8
 
 ## 许可
 
-| 组件 | 许可 |
-| --- | --- |
-| 本项目代码 | 见仓库 LICENSE |
-| chess.js | BSD-2-Clause（`js/chess-engine/chess.js.LICENSE`） |
-| Stockfish.js | **GPLv3**（`js/lib/README.md` 内有链接） |
-| cburnett 棋子 `img/chess/*.svg` | **CC BY-SA 3.0**（Cburnett，署名 + 相同方式共享） |
-| 开局库 `js/chess-book.js` | 数据源 lichess chess-openings，**CC0**（公共领域） |
+本项目**自己写的代码**是 **MIT**，见 [LICENSE](LICENSE)。
+项目同时**打包分发**了若干第三方组件，它们各自的许可优先：
 
-Stockfish 是 GPL 软件，若要分发本项目，需一并提供其源码。
-棋子图是 **CC BY-SA 3.0**（带 share-alike），与本项目代码的许可不同 —— 对外分发前
-请补上 Cburnett 署名，或改用许可更宽松的棋子集。
+| 组件 | 许可 | 位置 |
+| --- | --- | --- |
+| 本项目代码 | MIT | 见 [LICENSE](LICENSE) |
+| **Stockfish.js**（国际象棋 AI） | **GPLv3** | `js/lib/stockfish.js` + `.wasm` |
+| **cburnett 棋子图** | **CC BY-SA 3.0** | `img/chess/*.svg` |
+| Instrument Serif | **OFL-1.1** | `vendor/fonts/Instrument-Serif-*` |
+| Space Grotesk | **OFL-1.1** | `vendor/fonts/Space-Grotesk-*` |
+| JetBrains Mono | **OFL-1.1** | `vendor/fonts/JetBrains-Mono-*` |
+| Noto Serif SC（子集化） | **OFL-1.1** | `vendor/fonts/NotoSerifSC-subset.woff2` |
+| Material Design Icons | Apache-2.0 | `vendor/icons/mdi-sprite.svg` |
+| **godogpaw**（中国象棋引擎） | MIT | `js/lib/godogpaw/*` |
+| Go `wasm_exec.js` | BSD-3-Clause | `js/lib/godogpaw/wasm_exec.js` |
+| chess.js（国际象棋规则） | BSD-2-Clause | `js/chess-engine/chess.js.LICENSE` |
+| 首页配图 5 张 | Unsplash License | `img/home/*.webp` |
+| 开局库数据源 lichess chess-openings | CC0（公共领域） | 生成 `js/chess-book.js` |
+
+**完整清单（含版本号、每张配图的作者、每条署名义务、对外分发检查清单）见
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)**；OFL-1.1 全文见 [licenses/OFL-1.1.txt](licenses/OFL-1.1.txt)。
+
+**对外分发前必须做的两件事**：
+
+1. **Stockfish 是 GPLv3** —— 要一并提供它的完整对应源码（不能只给 binary）。
+2. **棋子图是 CC BY-SA 3.0** —— 要保留 Cburnett 署名与许可说明；若改编了棋子图，
+   衍生图必须继续以 CC BY-SA 3.0 发布（这条只约束图，不约束本项目代码）。
+
+仅本地自己用（不分发）则以上义务都不触发。

@@ -105,6 +105,8 @@
   let badgeWarn = true;
   let badgeLoading = false;        // 徽标处于「加载中」而非「真出错」
   let thinkTimer = null;           // 思考看门狗定时器
+  let readyTimer = null;           // 引擎就绪看门狗定时器（worker 迟迟不发 ready 时探活）
+  let readyPinged = false;         // 是否已经补发过一次 isready 探活
   let pendingPromotion = null;     // 升变选择器：{ from, to }
 
   let canvas, ctx, bgCanvas = null;
@@ -738,6 +740,7 @@
 
   /** 启动 Stockfish 线程 */
   function spawnEngine() {
+    disarmReadyWatchdog();
     if (worker) {
       try { worker.terminate(); } catch (e) { /* 已退出 */ }
       worker = null;
@@ -759,6 +762,41 @@
     };
     worker.postMessage({ type: 'boot' });
     initEngineState();
+    armReadyWatchdog();
+  }
+
+  /**
+   * 就绪看门狗。
+   *
+   * 为什么需要：worker 侧「握手完成」和主线程收到 `ready` 是两件事。
+   * 实测出现过 worker 日志里 `< uciok`、`握手完成（booted=true）` 都在，
+   * 主线程却始终没进 ready 分支 —— 徽标永远停在「正在加载 Stockfish…」，
+   * 表现成「引擎明明找到了却说没找到」，而且没有任何报错可查。
+   *
+   * 处理：1.8s 还没 ready 就发 isready 探活，worker 会借 readyok 补发 ready；
+   *       再等 2.5s 仍没有，就明确告诉用户是「找到了但起不来」，而不是含糊的加载中。
+   */
+  function armReadyWatchdog() {
+    disarmReadyWatchdog();
+    readyPinged = false;
+    readyTimer = setTimeout(() => {
+      if (engineReady) return;
+      readyPinged = true;
+      console.warn('[chess] 引擎 1.8s 未就绪，发 isready 探活');
+      try { if (worker) worker.postMessage({ type: 'ping' }); } catch (e) { /* worker 已退出 */ }
+      readyTimer = setTimeout(() => {
+        if (engineReady) return;
+        console.error('[chess] 引擎探测到文件但一直没就绪 —— worker 侧握手异常，请把控制台 [sf] 日志给开发者');
+        badgeLoading = false;
+        showEngineBadge('Stockfish 已找到但未就绪', true);
+        setEngineMissingHint(false);
+        setStatus('检测到 Stockfish 文件，但引擎握手没完成 —— 按 Ctrl+Shift+R 强刷一次试试；仍旧不行请把控制台 [sf] 日志发出来', true);
+      }, 2500);
+    }, 1800);
+  }
+
+  function disarmReadyWatchdog() {
+    if (readyTimer) { clearTimeout(readyTimer); readyTimer = null; }
   }
 
   function initEngineState() {
@@ -885,6 +923,8 @@
 
     if (type === 'ready') {
       engineReady = true;
+      disarmReadyWatchdog();
+      if (readyPinged) console.log('[chess] 引擎经 isready 探活后就绪');
       // 握手成功此刻才成立。worker 被创建不等于引擎可用，
       // 之前无条件写死「已加载」会让引擎起不来时侧栏一直谎报。
       //
@@ -907,6 +947,7 @@
       // 反而会让用户以为文件没放好。改为提示换服务器 / 重试。
       engineReady = false;
       badgeLoading = false;
+      disarmReadyWatchdog();
       showEngineBadge('Stockfish 启动失败', true);
       setEngineMissingHint(false);
       setStatus('Stockfish 启动失败（' + ((data && data.reason) || '未知原因')

@@ -2,6 +2,31 @@ MIT License
 
 Copyright (c) 2026 Salmon
 
+--------------------------------------------------------------------------
+适用范围：这个 MIT 许可只覆盖本项目自己写的代码（js/、css/、index.html、
+tools/、sw.js 等），不含下面这些第三方文件。
+
+项目打包分发了第三方组件，它们各自的许可优先：
+
+  Stockfish（国际象棋引擎）      GPLv3          js/lib/stockfish.js + .wasm
+  cburnett 棋子图                CC BY-SA 3.0   img/chess/*.svg
+  Instrument Serif               OFL-1.1        vendor/fonts/Instrument-Serif-*
+  Space Grotesk                  OFL-1.1        vendor/fonts/Space-Grotesk-*
+  JetBrains Mono                 OFL-1.1        vendor/fonts/JetBrains-Mono-*
+  Noto Serif SC                  OFL-1.1        vendor/fonts/NotoSerifSC-subset.woff2
+  Material Design Icons          Apache-2.0     vendor/icons/mdi-sprite.svg
+  godogpaw（中国象棋引擎）        MIT            js/lib/godogpaw/*
+  Go wasm_exec.js                BSD-3-Clause   js/lib/godogpaw/wasm_exec.js
+  chess.js（国际象棋规则）        BSD-2-Clause   js/chess-engine/chess.js
+  首页配图 5 张                  Unsplash       img/home/*.webp
+
+OFL-1.1 全文见 licenses/OFL-1.1.txt。
+完整清单、版本号、署名义务与对外分发检查清单见 THIRD-PARTY-NOTICES.md。
+
+注意：若要对外分发本项目，Stockfish 的 GPLv3 要求一并提供其源码；
+棋子图需保留 Cburnett 署名与 CC BY-SA 3.0 说明。仅本地自用则无这些义务。
+--------------------------------------------------------------------------
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
