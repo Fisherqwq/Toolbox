@@ -51,7 +51,7 @@ Toolbox-main/
     │
     ├── xiangqi.js          中国象棋界面与对局（规则全在引擎里）
     ├── lib/godogpaw/       中国象棋引擎 godogpaw（Go/WASM）+ 桥接层
-    └── lib/                Stockfish 可执行文件（不入库，见 js/lib/README.md）
+    └── lib/                Stockfish 可执行文件（已入库，见 js/lib/README.md）
 tools/
     ├── build-chess-book.mjs      重新生成开局库（Node 脚本）
     ├── build-vendor-assets.mjs   重新生成 vendor/ 的字体与图标

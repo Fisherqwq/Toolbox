@@ -12,7 +12,8 @@
  * 页面侧 js/sw-register.js 会提示「有新版本」，用户确认后 skipWaiting 立即生效。
  */
 
-const CACHE_VERSION = 'v3';
+// v4：js/lib/stockfish.* 入库并部署到 GitHub Pages（此前线上 404，预缓存一直装不上引擎）
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `toolbox-${CACHE_VERSION}`;
 
 const PRECACHE = [

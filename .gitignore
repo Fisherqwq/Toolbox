@@ -1,9 +1,9 @@
-# ---- 第三方引擎二进制：不进版本库 ----
-# 这些是可从上游重新下载的第三方文件（Stockfish，GPLv3），
-# 体积大且与业务代码无关，纳入 git 会让仓库臃肿、diff 失效。
-# 缺失时页面会提示下载入口，详见 README。
-js/lib/stockfish.js
-js/lib/stockfish.wasm
+# ---- 第三方引擎二进制：**要入库**（下面两行是显式反忽略，防止将来加通配规则时被误伤）----
+# Stockfish.js（GPLv3）虽然可从上游重新下载，但它是 GitHub Pages 上国际象棋
+# 唯一的 AI 引擎，仓库里没有它线上页面就无法对弈、更无法离线使用，
+# 所以与 godogpaw 一样必须随仓库部署。体积仅 1.8 MB，可以接受。
+!js/lib/stockfish.js
+!js/lib/stockfish.wasm
 
 # ---- godogpaw 中国象棋引擎：**要入库**（下面两行是显式反忽略，防止将来加通配规则时被误伤）----
 # 它不是从上游直接下载的，而是本地编译产物，上游 release 里没有现成 wasm；

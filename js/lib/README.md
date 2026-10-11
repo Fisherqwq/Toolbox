@@ -4,7 +4,7 @@
 
 | 子目录 / 文件 | 属于 | 是否入库 | 说明 |
 | --- | --- | --- | --- |
-| `stockfish.js` + `stockfish.wasm` | 国际象棋 | **否**（见 `.gitignore`） | Stockfish 19 Lite，可从上游重新下载 |
+| `stockfish.js` + `stockfish.wasm` | 国际象棋 | **是**（`.gitignore` 已显式反忽略） | Stockfish 19 Lite，GitHub Pages 上没有它就无法对弈，必须随仓库部署 |
 | `godogpaw/` | 中国象棋 | **是** | godogpaw（Go/WASM），本地编译产物，上游没有现成 wasm |
 | `pikafish/` | —— | —— | **已删除**（2026-10-11 清理：曾尝试接入，最终未用，无人引用） |
 

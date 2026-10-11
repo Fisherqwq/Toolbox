@@ -92,8 +92,8 @@ OFL 全文：<https://openfontlicense.org/open-font-license-official-text/>
 - **没有**修改 Stockfish 的源码或二进制，只是原样加载
 - **没有**把 GPLv3 传染到本项目其余代码：本项目通过标准 Worker 消息与它通信，
   属于独立进程边界的聚合，不需要整体改 GPL
-- ⚠ `js/lib/stockfish.wasm` 在 `.gitignore` 里（体积原因不入库），
-  **对外分发时别漏了把它和源码链接一起给出去**
+- `js/lib/stockfish.wasm` **已入库**（GitHub Pages 部署需要，1.8 MB 可接受），
+  对外分发时仍要**把 GPLv3 源码链接一起给出去**
 
 ---
 

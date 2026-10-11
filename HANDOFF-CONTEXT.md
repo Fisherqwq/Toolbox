@@ -327,6 +327,6 @@ HTML 文档走 **network-first**（保证能更新），其余 cache-first；
 - [ ] 语法与测试：`node --check <每个 js>`、`node js/chess-engine/test.mjs`、
       `node tools/test-xiangqi.mjs`
 - [ ] **确认有浏览器可验证**，否则先按第五节埋日志，别靠猜
-- [ ] `.gitignore` 已排除 `js/lib/stockfish.*`，**换机器时要单独拷模型文件**
+- [x] `js/lib/stockfish.*` 已入库（`.gitignore` 显式反忽略），随仓库部署到 GitHub Pages，线上可对弈、可离线
 - [ ] 改了样式或脚本后，**升 `sw.js` 的 `CACHE_VERSION`**，否则用户可能拿到旧文件
 - [ ] 对外分发前补 cburnett 署名（CC BY-SA）与 Stockfish 源码（GPLv3）
