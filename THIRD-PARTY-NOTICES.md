@@ -40,6 +40,7 @@
 | Noto Serif SC | 2017–2023 Adobe | **OFL-1.1** | `vendor/fonts/NotoSerifSC-subset.woff2` | 中文标题衬线 |
 | 配图 5 张 | — | **Unsplash License** | `img/home/*.webp` | 首页配图（**署名要求见第六节**） |
 | Lichess chess-openings | — | **CC0-1.0** | `js/chess-book.js` | 开局库数据源 |
+| 五子棋引擎（改编自 gobang） | — | 未声明 | `js/gomoku-engine/` | 五子棋 AI 算法（Alpha-Beta 剪枝） |
 
 ---
 
@@ -160,6 +161,7 @@ OFL 全文：<https://openfontlicense.org/open-font-license-official-text/>
 | **chess.js** | BSD-2-Clause，© 2025 Jeff Hlywa | 国际象棋规则。全文在 `js/chess-engine/chess.js.LICENSE` |
 | **Material Design Icons** | Apache-2.0，© Pictogrammers | <https://github.com/Templarian/MaterialDesign/blob/master/LICENSE>。本项目只打包了其中 13 个图标（`vendor/icons/mdi-sprite.svg`） |
 | **Lichess chess-openings** | CC0-1.0（公共领域） | 开局库数据源，`js/chess-book.js` 由 `tools/build-chess-book.mjs` 生成。CC0 无署名义务 |
+| **gobang**（五子棋引擎上游） | **未声明**（仓库无 LICENSE 文件，见 [issue #57](https://github.com/lihongxun945/gobang/issues/57)） | 本项目 `js/gomoku-engine/` 的五子棋 AI 算法改编自 <https://github.com/lihongxun945/gobang>（作者 lihongxun945）。该仓库目前没有附带开源许可证，上游代码默认保留所有权利。**对外分发前建议联系作者确认授权，或自行替换为有明确许可的引擎。** |
 
 ### 只用于**构建**、不进分发产物的工具
 
@@ -180,3 +182,4 @@ OFL 全文：<https://openfontlicense.org/open-font-license-official-text/>
 - [ ] `js/chess-engine/chess.js.LICENSE`、`中国象棋模型/参考项目/godogpaw/LICENSE` 随包保留
 - [ ] 若改了棋子图 → 衍生图必须继续 CC BY-SA 3.0
 - [ ] 若换了引擎 → 更新本文件第二节总览表
+- [ ] 五子棋引擎改编自 `lihongxun945/gobang`，该仓库目前无开源许可证。对外分发前需联系作者确认授权，或替换为有明确许可的五子棋引擎

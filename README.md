@@ -398,6 +398,7 @@ node tools/test-xiangqi-browser.mjs    # 浏览器端到端 27 项（需 Chrome/
 | Go `wasm_exec.js` | BSD-3-Clause | `js/lib/godogpaw/wasm_exec.js` |
 | chess.js（国际象棋规则） | BSD-2-Clause | `js/chess-engine/chess.js.LICENSE` |
 | 首页配图 5 张 | Unsplash License | `img/home/*.webp` |
+| **gobang**（五子棋引擎上游） | **未声明**（仓库无 LICENSE） | 改编后位于 `js/gomoku-engine/`，上游 <https://github.com/lihongxun945/gobang> |
 | 开局库数据源 lichess chess-openings | CC0（公共领域） | 生成 `js/chess-book.js` |
 
 **完整清单（含版本号、每张配图的作者、每条署名义务、对外分发检查清单）见
@@ -408,5 +409,6 @@ node tools/test-xiangqi-browser.mjs    # 浏览器端到端 27 项（需 Chrome/
 1. **Stockfish 是 GPLv3** —— 要一并提供它的完整对应源码（不能只给 binary）。
 2. **棋子图是 CC BY-SA 3.0** —— 要保留 Cburnett 署名与许可说明；若改编了棋子图，
    衍生图必须继续以 CC BY-SA 3.0 发布（这条只约束图，不约束本项目代码）。
+3. **五子棋引擎改编自 `lihongxun945/gobang`** —— 该仓库目前没有开源许可证，对外分发前建议联系作者确认授权，或替换为有明确许可的五子棋引擎。
 
 仅本地自己用（不分发）则以上义务都不触发。
